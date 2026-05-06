@@ -27,6 +27,14 @@ import javax.crypto.spec.SecretKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Encrypted backup / restore for connection profiles, keys, known hosts,
+ * port-forwards, tunnel configs, and a small block of settings.
+ *
+ * The wire format and a manual-decrypt Python recipe live in
+ * `docs/backup-format.md`. Touch that file when changing [encrypt],
+ * [decrypt], [BACKUP_VERSION] or any of the envelope constants below.
+ */
 @Singleton
 class BackupService @Inject constructor(
     private val connectionDao: ConnectionDao,

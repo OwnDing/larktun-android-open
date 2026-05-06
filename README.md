@@ -94,6 +94,9 @@ Output: `app/build/outputs/apk/debug/haven-*-debug.apk`
 ## Documentation
 
 - [Features](docs/FEATURES.md) — detailed feature descriptions.
+- [Backup file format](docs/backup-format.md) — wire format, the
+  PBKDF2/AES-GCM envelope, and a Python recipe for manual decryption
+  if the in-app importer fails.
 - [Release process](RELEASE.md) — versioning, tagging, F-Droid and Play Store steps.
 - [Privacy policy](PRIVACY_POLICY.md).
 - [Roadmap](ROADMAP.md) and [Vision](VISION.md).
