@@ -132,4 +132,30 @@
     <string name="connections_use_android_shell">Use native Android shell</string>
     <!-- Backfilled translations (i18n drift fix) -->
     <string name="connections_new_session_create">作成</string>
+
+    <!-- #135 -->
+    <string name="connections_field_vnc_host_via_ssh">VNC host (on SSH server)</string>
+    <string name="connections_field_rdp_host_via_ssh">RDP host (on SSH server)</string>
+    <string name="connections_toggle_run_before_session_manager">Run before session manager</string>
+    <string name="connections_toggle_disable_alt_screen">Disable alternate screen</string>
+    <string name="connections_helper_disable_alt_screen">Scrollback works in screen/vim. Program output stays in scrollback on exit.</string>
+    <string name="connections_toggle_forward_agent">Forward SSH agent</string>
+    <string name="connections_helper_forward_agent">Exposes non-encrypted stored SSH keys to the remote host (for git push etc.). Encrypted keys are skipped.</string>
+    <string name="connections_field_ssh_key">SSH Key</string>
+    <string name="connections_ssh_key_any">Any (try all keys)</string>
+    <string name="connections_field_vnc_port">VNC port</string>
+    <string name="connections_field_vnc_password">VNC password</string>
+    <string name="connections_field_vnc_color_depth">VNC colour depth</string>
+    <string name="connections_action_clear_vnc">Clear saved VNC settings</string>
+    <string name="connections_toggle_local_sideband">Local Sideband</string>
+    <string name="connections_field_gateway_host">Gateway Host</string>
+    <string name="connections_field_network_name">Network Name</string>
+    <string name="connections_helper_network_name">IFAC network name (optional)</string>
+    <string name="connections_action_scan_rnsh">Scan for rnsh nodes</string>
+    <string name="connections_field_destination_hash">Destination Hash</string>
+    <string name="connections_helper_destination_hash">32-character hex</string>
+    <string name="connections_field_color_scheme">Terminal colour scheme</string>
+    <string name="connections_color_scheme_inherit">Use default (global setting)</string>
+
+    <string name="connections_tunnel_dropdown_label">Tunnel: %1$s</string>
 </resources>

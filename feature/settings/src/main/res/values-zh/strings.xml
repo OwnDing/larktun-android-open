@@ -214,4 +214,12 @@
     <string name="settings_touchpad_input_touchpad_subtitle">拖动移动远程光标；点击在光标处单击。缩放时视口跟随光标。</string>
     <string name="settings_bandwidth_suggest_title">慢速 VNC 链接上建议 256 色</string>
     <string name="settings_bandwidth_suggest_subtitle">数秒后检测到吞吐量低于约 1 Mbps，并提供一键以 256 色重连。关闭以隐藏此提示。</string>
+
+    <!-- #135 -->
+    <string name="settings_keyboard_mode_title">键盘模式</string>
+    <string name="settings_dev_install_title">开发者安装</string>
+    <string name="settings_dev_install_apk_url">APK 地址</string>
+    <string name="settings_mcp_tunnel_title">通过哪个连接配置文件转发 MCP？</string>
+    <string name="settings_font_install_title">从 URL 安装字体</string>
+    <string name="settings_ime_flags_title">输入法标志</string>
 </resources>

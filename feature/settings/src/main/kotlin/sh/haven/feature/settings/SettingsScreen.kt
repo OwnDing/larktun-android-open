@@ -886,7 +886,7 @@ fun SettingsScreen(
         }
         AlertDialog(
             onDismissRequest = { showKeyboardModeDialog = false },
-            title = { Text("Keyboard mode") },
+            title = { Text(stringResource(R.string.settings_keyboard_mode_title)) },
             text = {
                 Column {
                     modes.forEach { (id, label, description) ->
@@ -2404,7 +2404,7 @@ private fun DevInstallDialog(
 
     AlertDialog(
         onDismissRequest = { if (!installing) onDismiss() },
-        title = { Text("Dev Install") },
+        title = { Text(stringResource(R.string.settings_dev_install_title)) },
         text = {
             Column {
                 Text(
@@ -2416,7 +2416,7 @@ private fun DevInstallDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("APK URL") },
+                    label = { Text(stringResource(R.string.settings_dev_install_apk_url)) },
                     singleLine = true,
                     enabled = !installing,
                     modifier = Modifier.fillMaxWidth(),
@@ -2453,13 +2453,13 @@ private fun DevInstallDialog(
                     )
                 },
                 enabled = !installing && url.isNotBlank(),
-            ) { Text("Install") }
+            ) { Text(stringResource(R.string.common_install)) }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
                 enabled = !installing,
-            ) { Text("Cancel") }
+            ) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }
@@ -2479,7 +2479,7 @@ private fun McpTunnelPickerDialog(
     val sshProfiles = profiles.filter { it.isSsh }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tunnel MCP through which profile?") },
+        title = { Text(stringResource(R.string.settings_mcp_tunnel_title)) },
         text = {
             if (sshProfiles.isEmpty()) {
                 Text(
@@ -2515,7 +2515,7 @@ private fun McpTunnelPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }
@@ -2535,7 +2535,7 @@ private fun FontFromUrlDialog(
     val canSubmit = url.isNotBlank() && (url.startsWith("http://") || url.startsWith("https://"))
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Install font from URL") },
+        title = { Text(stringResource(R.string.settings_font_install_title)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -2557,7 +2557,7 @@ private fun FontFromUrlDialog(
             TextButton(
                 onClick = { onInstall(url) },
                 enabled = canSubmit,
-            ) { Text("Install") }
+            ) { Text(stringResource(R.string.common_install)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
@@ -2594,7 +2594,7 @@ private fun ImeFlagsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("IME flags") },
+        title = { Text(stringResource(R.string.settings_ime_flags_title)) },
         text = {
             Column(
                 modifier = Modifier

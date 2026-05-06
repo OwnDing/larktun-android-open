@@ -549,7 +549,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = { Text(if (vncSshForward) "VNC host (on SSH server)" else "Host") },
+                        label = { Text(stringResource(if (vncSshForward) R.string.connections_field_vnc_host_via_ssh else R.string.common_host)) },
                         placeholder = { Text(if (vncSshForward) "127.0.0.1" else "192.168.1.100") },
                         supportingText = if (vncSshForward) {
                             {
@@ -703,7 +703,7 @@ fun ConnectionEditDialog(
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = { Text(if (rdpSshForward) "RDP host (on SSH server)" else "Host") },
+                        label = { Text(stringResource(if (rdpSshForward) R.string.connections_field_rdp_host_via_ssh else R.string.common_host)) },
                         placeholder = { Text(if (rdpSshForward) "127.0.0.1" else "192.168.1.100") },
                         supportingText = if (rdpSshForward) {
                             {
@@ -1345,7 +1345,7 @@ fun ConnectionEditDialog(
                                     DropdownMenuItem(
                                         text = {
                                             Column {
-                                                Text("Tunnel: ${tunnel.label}")
+                                                Text(stringResource(R.string.connections_tunnel_dropdown_label, tunnel.label))
                                                 Text(
                                                     runCatching {
                                                         sh.haven.core.data.db.entities.TunnelConfigType
@@ -1568,14 +1568,14 @@ fun ConnectionEditDialog(
                         FilterChip(
                             selected = postLoginBeforeSessionManager,
                             onClick = { postLoginBeforeSessionManager = !postLoginBeforeSessionManager },
-                            label = { Text("Run before session manager") },
+                            label = { Text(stringResource(R.string.connections_toggle_run_before_session_manager)) },
                         )
                     }
 
                     // File transport picker — Auto / SFTP / SCP (legacy)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "File transport",
+                        stringResource(R.string.connections_section_file_transport),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
@@ -1623,11 +1623,11 @@ fun ConnectionEditDialog(
                     FilterChip(
                         selected = disableAltScreen,
                         onClick = { disableAltScreen = !disableAltScreen },
-                        label = { Text("Disable alternate screen") },
+                        label = { Text(stringResource(R.string.connections_toggle_disable_alt_screen)) },
                     )
                     if (disableAltScreen) {
                         Text(
-                            "Scrollback works in screen/vim. Program output stays in scrollback on exit.",
+                            stringResource(R.string.connections_helper_disable_alt_screen),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1694,11 +1694,11 @@ fun ConnectionEditDialog(
                     FilterChip(
                         selected = forwardAgent,
                         onClick = { forwardAgent = !forwardAgent },
-                        label = { Text("Forward SSH agent") },
+                        label = { Text(stringResource(R.string.connections_toggle_forward_agent)) },
                     )
                     if (forwardAgent) {
                         Text(
-                            "Exposes non-encrypted stored SSH keys to the remote host (for git push etc.). Encrypted keys are skipped.",
+                            stringResource(R.string.connections_helper_forward_agent),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1755,7 +1755,7 @@ fun ConnectionEditDialog(
                                 value = selectedKey?.label ?: "Any (try all keys)",
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("SSH Key") },
+                                label = { Text(stringResource(R.string.connections_field_ssh_key)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(keyExpanded) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1766,7 +1766,7 @@ fun ConnectionEditDialog(
                                 onDismissRequest = { keyExpanded = false },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Any (try all keys)") },
+                                    text = { Text(stringResource(R.string.connections_ssh_key_any)) },
                                     onClick = {
                                         keyId = null
                                         keyExpanded = false
@@ -1810,7 +1810,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = vncSavedPort,
                             onValueChange = { vncSavedPort = it.filter { c -> c.isDigit() } },
-                            label = { Text("VNC port") },
+                            label = { Text(stringResource(R.string.connections_field_vnc_port)) },
                             placeholder = { Text("5900") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -1820,7 +1820,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = vncUsername,
                             onValueChange = { vncUsername = it },
-                            label = { Text("VNC username (optional — VeNCrypt only)") },
+                            label = { Text(stringResource(R.string.connections_field_username_vnc)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -1828,7 +1828,7 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = vncPassword,
                             onValueChange = { vncPassword = it },
-                            label = { Text("VNC password") },
+                            label = { Text(stringResource(R.string.connections_field_vnc_password)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -1862,7 +1862,7 @@ fun ConnectionEditDialog(
                                 value = selectedSavedDepth.second,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("VNC colour depth") },
+                                label = { Text(stringResource(R.string.connections_field_vnc_color_depth)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(savedDepthExpanded) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1885,7 +1885,7 @@ fun ConnectionEditDialog(
                         }
                         Spacer(Modifier.height(4.dp))
                         TextButton(onClick = { vncSettingsStored = false }) {
-                            Text("Clear saved VNC settings")
+                            Text(stringResource(R.string.connections_action_clear_vnc))
                         }
                     }
 
@@ -1903,7 +1903,7 @@ fun ConnectionEditDialog(
                                 rnsPort = "37428"
                             }
                         },
-                        label = { Text("Local Sideband") },
+                        label = { Text(stringResource(R.string.connections_toggle_local_sideband)) },
                     )
                     if (!localSideband) {
                         Spacer(Modifier.height(4.dp))
@@ -1913,7 +1913,7 @@ fun ConnectionEditDialog(
                             OutlinedTextField(
                                 value = rnsHost,
                                 onValueChange = { rnsHost = it },
-                                label = { Text("Gateway Host") },
+                                label = { Text(stringResource(R.string.connections_field_gateway_host)) },
                                 placeholder = { Text("192.168.0.2") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
@@ -1931,8 +1931,8 @@ fun ConnectionEditDialog(
                         OutlinedTextField(
                             value = rnsNetworkName,
                             onValueChange = { rnsNetworkName = it },
-                            label = { Text("Network Name") },
-                            placeholder = { Text("IFAC network name (optional)") },
+                            label = { Text(stringResource(R.string.connections_field_network_name)) },
+                            placeholder = { Text(stringResource(R.string.connections_helper_network_name)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -1968,9 +1968,9 @@ fun ConnectionEditDialog(
                                 strokeWidth = 2.dp,
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("Scanning...")
+                            Text(stringResource(R.string.connections_scanning) + "…")
                         } else {
-                            Text("Scan for rnsh nodes")
+                            Text(stringResource(R.string.connections_action_scan_rnsh))
                         }
                     }
 
@@ -2019,8 +2019,8 @@ fun ConnectionEditDialog(
                             destinationHash = it.filter { c -> c in "0123456789abcdefABCDEF" }
                                 .take(32)
                         },
-                        label = { Text("Destination Hash") },
-                        placeholder = { Text("32-character hex") },
+                        label = { Text(stringResource(R.string.connections_field_destination_hash)) },
+                        placeholder = { Text(stringResource(R.string.connections_helper_destination_hash)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -2239,12 +2239,12 @@ fun ConnectionEditDialog(
                 },
                 enabled = canSave,
             ) {
-                Text("Save")
+                Text(stringResource(R.string.common_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_cancel))
             }
         },
     )
@@ -2275,7 +2275,7 @@ private fun ProfileColorSchemeDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Terminal colour scheme") },
+        title = { Text(stringResource(R.string.connections_field_color_scheme)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 ListItem(
@@ -2300,7 +2300,7 @@ private fun ProfileColorSchemeDialog(
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
-                            Text("Use default (global setting)")
+                            Text(stringResource(R.string.connections_color_scheme_inherit))
                         }
                     },
                     leadingContent = {
@@ -2352,7 +2352,7 @@ private fun ProfileColorSchemeDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }

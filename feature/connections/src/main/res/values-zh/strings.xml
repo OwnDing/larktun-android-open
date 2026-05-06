@@ -180,4 +180,29 @@
     <string name="connection_address_family_ipv6_only">仅 IPv6</string>
     <string name="connection_address_family_ipv4_hint">跳过 AAAA 记录，仅通过 IPv4 连接。适用于 DNS 返回 IPv6 但网络无法路由的情况。</string>
     <string name="connection_address_family_ipv6_hint">跳过 A 记录，仅通过 IPv6 连接。适用于 IPv4 NAT 损坏的纯 IPv6 网络。</string>
+
+    <!-- #135 -->
+    <string name="connections_field_vnc_host_via_ssh">VNC 主机（在 SSH 服务器上）</string>
+    <string name="connections_field_rdp_host_via_ssh">RDP 主机（在 SSH 服务器上）</string>
+    <string name="connections_toggle_run_before_session_manager">在会话管理器之前运行</string>
+    <string name="connections_toggle_disable_alt_screen">禁用备用屏幕</string>
+    <string name="connections_helper_disable_alt_screen">在 screen/vim 中可滚动回看。程序退出后输出仍保留在回滚缓冲区中。</string>
+    <string name="connections_toggle_forward_agent">转发 SSH 代理</string>
+    <string name="connections_helper_forward_agent">将未加密的已存 SSH 密钥暴露给远程主机（用于 git push 等）。加密的密钥会被跳过。</string>
+    <string name="connections_field_ssh_key">SSH 密钥</string>
+    <string name="connections_ssh_key_any">任意（尝试所有密钥）</string>
+    <string name="connections_field_vnc_port">VNC 端口</string>
+    <string name="connections_field_vnc_password">VNC 密码</string>
+    <string name="connections_field_vnc_color_depth">VNC 色深</string>
+    <string name="connections_action_clear_vnc">清除已保存的 VNC 设置</string>
+    <string name="connections_toggle_local_sideband">本地 Sideband</string>
+    <string name="connections_field_gateway_host">网关主机</string>
+    <string name="connections_field_network_name">网络名称</string>
+    <string name="connections_helper_network_name">IFAC 网络名称（可选）</string>
+    <string name="connections_action_scan_rnsh">扫描 rnsh 节点</string>
+    <string name="connections_field_destination_hash">目标哈希</string>
+    <string name="connections_helper_destination_hash">32 位十六进制</string>
+    <string name="connections_field_color_scheme">终端配色方案</string>
+    <string name="connections_color_scheme_inherit">使用默认设置（全局）</string>
+    <string name="connections_tunnel_dropdown_label">隧道: %1$s</string>
 </resources>
