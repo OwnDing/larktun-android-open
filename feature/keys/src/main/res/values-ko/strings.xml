@@ -78,4 +78,15 @@
     <string name="keys_attach_certificate">인증서 첨부</string>
     <string name="keys_remove_certificate">인증서 제거</string>
     <string name="keys_chip_certificate">인증서 첨부됨</string>
+
+    <!-- #133 phase 2: step-ca generate-via-OIDC -->
+    <string name="keys_generate_via_stepca">step-ca로 생성</string>
+    <string name="keys_generate_via_stepca_hint">OIDC 로그인으로 새 키 쌍과 서명된 인증서를 발급합니다</string>
+    <string name="keys_generate_via_stepca_no_ca">먼저 설정 → 인증 기관에서 CA를 추가하세요</string>
+    <string name="keys_stepca_dialog_title">step-ca로 생성</string>
+    <string name="keys_stepca_pick_ca">인증 기관</string>
+    <string name="keys_stepca_principals_override_label">주체 재정의 (선택, 쉼표로 구분)</string>
+    <string name="keys_stepca_label">키 라벨</string>
+    <string name="keys_stepca_generate">생성</string>
+    <string name="keys_chip_certificate_minted">%1$s 발급</string>
 </resources>
