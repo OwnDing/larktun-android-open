@@ -89,7 +89,51 @@ cd Haven
 ./gradlew assembleDebug
 ```
 
-Output: `app/build/outputs/apk/debug/haven-*-debug.apk`
+Output: `app/build/outputs/apk/<abi>/debug/haven-*-debug.apk`
+
+### macOS build
+
+On macOS, install the native build tools first. The Android SDK should already
+be installed by Android Studio.
+
+```bash
+# Homebrew tools used by the native build scripts
+brew install rustup go coreutils gnu-sed
+
+# macOS PATH compatibility for scripts that expect GNU sed/coreutils
+BREW_PREFIX="$(brew --prefix)"
+export PATH="$BREW_PREFIX/opt/gnu-sed/libexec/gnubin:$BREW_PREFIX/opt/coreutils/libexec/gnubin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
+
+# Rust (for RDP)
+rustup-init -y --default-toolchain stable --profile default
+source "$HOME/.cargo/env"
+rustup target add aarch64-linux-android x86_64-linux-android
+cargo install cargo-ndk
+
+# Go (for rclone cloud storage)
+go install golang.org/x/mobile/cmd/gomobile@latest
+go install golang.org/x/mobile/cmd/gobind@latest
+gomobile init
+
+# Android SDK / CMake
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.31.6"
+
+# The PRoot build script expects the Linux NDK prebuilt path name.
+# On macOS, point that name at the Darwin prebuilt toolchain.
+NDK_VERSION="29.0.14206865"
+NDK_PREBUILT="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt"
+ln -sfn darwin-x86_64 "$NDK_PREBUILT/linux-x86_64"
+
+./gradlew assembleDebug
+```
+
+Debug APKs are generated under:
+
+```text
+app/build/outputs/apk/arm64/debug/haven-*-arm64-debug.apk
+app/build/outputs/apk/x64/debug/haven-*-x64-debug.apk
+```
 
 ## Documentation
 
