@@ -72,6 +72,30 @@
     <string name="connections_larktun_address_copied">Address copied</string>
     <string name="connections_larktun_no_address">No address available for this device</string>
     <string name="connections_larktun_web_open_failed">Failed to open web browser</string>
+    <string name="connections_larktun_ping_title">Pinging %1$s</string>
+    <string name="connections_larktun_ping_samples">%1$d / %2$d samples</string>
+    <string name="connections_larktun_ping_running">Collecting ping samples\u2026</string>
+    <string name="connections_larktun_ping_failed">Ping failed: %1$s</string>
+    <string name="connections_larktun_ping_latest_empty">-- ms</string>
+    <string name="connections_larktun_ping_chart_min">0 ms</string>
+    <string name="connections_larktun_ping_chart_max">%1$d ms</string>
+    <string name="connections_larktun_ping_mode_direct">Direct</string>
+    <string name="connections_larktun_ping_mode_derp">DERP relay</string>
+    <string name="connections_larktun_ping_mode_peer_relay">Peer relay</string>
+    <string name="connections_larktun_ping_mode_tsmp">TSMP</string>
+    <string name="connections_larktun_ping_mode_not_connected">Not connected</string>
+    <string name="connections_larktun_ping_mode_unknown">Waiting</string>
+    <string name="connections_larktun_ssh_title">SSH to %1$s</string>
+    <string name="connections_larktun_ssh_auth_password">Password</string>
+    <string name="connections_larktun_ssh_auth_key">SSH key</string>
+    <string name="connections_larktun_ssh_saved_account">Saved account</string>
+    <string name="connections_larktun_ssh_remember_password">Remember password</string>
+    <string name="connections_larktun_ssh_select_key">Select SSH key</string>
+    <string name="connections_larktun_ssh_no_keys">No SSH keys saved. Add one in the Keys tab.</string>
+    <string name="connections_larktun_ssh_key_passphrase">Key passphrase</string>
+    <string name="connections_larktun_ssh_key_encrypted">Passphrase required</string>
+    <string name="connections_larktun_ssh_forget_saved">Forget saved password</string>
+    <string name="connections_larktun_ssh_connect">Connect</string>
 
     <!-- Empty state -->
     <string name="connections_empty_title">No connections yet</string>

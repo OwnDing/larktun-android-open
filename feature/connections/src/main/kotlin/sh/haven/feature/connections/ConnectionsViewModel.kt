@@ -52,6 +52,7 @@ import sh.haven.core.data.larktun.LarktunAccountRepository
 import sh.haven.core.data.larktun.LarktunCaptcha
 import sh.haven.core.data.larktun.LarktunConfig
 import sh.haven.core.data.larktun.LarktunSession
+import sh.haven.core.data.larktun.LarktunSshCredential
 import sh.haven.core.tunnel.LarktunTailnetManager
 import sh.haven.core.tunnel.LarktunTailnetPeer
 import sh.haven.core.tunnel.LarktunTailnetStatus
@@ -84,6 +85,22 @@ data class GroupLaunchState(
     val succeeded: Int,
     val skipped: Int,
     val connectingIds: Set<String>,
+)
+
+enum class LarktunPingConnectionMode {
+    DIRECT,
+    DERP,
+    PEER_RELAY,
+    TSMP,
+    NOT_CONNECTED,
+    UNKNOWN,
+}
+
+data class LarktunPingSample(
+    val index: Int,
+    val latencyMillis: Double? = null,
+    val connectionMode: LarktunPingConnectionMode = LarktunPingConnectionMode.UNKNOWN,
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
@@ -149,6 +166,10 @@ class ConnectionsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val larktunTailnetStatus: StateFlow<LarktunTailnetStatus> = larktunTailnetManager.status
+
+    val larktunSshCredentials: StateFlow<List<LarktunSshCredential>> =
+        larktunAccountRepository.sshCredentials
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
@@ -311,14 +332,85 @@ class ConnectionsViewModel @Inject constructor(
         }
     }
 
-    fun larktunSshProfile(peer: LarktunTailnetPeer): ConnectionProfile? {
+    suspend fun pingLarktunPeerSample(peer: LarktunTailnetPeer, index: Int): LarktunPingSample {
+        val address = peer.primaryTailscaleIP
+            ?: return LarktunPingSample(
+                index = index,
+                connectionMode = LarktunPingConnectionMode.NOT_CONNECTED,
+                errorMessage = "No Tailscale IP available",
+            )
+        return try {
+            val result = larktunTailnetManager.ping(address, timeoutMs = 6_000)
+            val latencyMillis = result.latencySeconds
+                ?.times(1_000.0)
+                ?.takeIf { !it.isNaN() && !it.isInfinite() && it >= 0.0 }
+            val mode = when {
+                !result.peerRelay.isNullOrBlank() -> LarktunPingConnectionMode.PEER_RELAY
+                result.derpRegionID != 0 -> LarktunPingConnectionMode.DERP
+                !result.endpoint.isNullOrBlank() -> LarktunPingConnectionMode.DIRECT
+                latencyMillis != null -> LarktunPingConnectionMode.TSMP
+                result.isLocalIP -> LarktunPingConnectionMode.NOT_CONNECTED
+                else -> LarktunPingConnectionMode.UNKNOWN
+            }
+            LarktunPingSample(
+                index = index,
+                latencyMillis = latencyMillis,
+                connectionMode = mode,
+                errorMessage = result.error?.takeIf { it.isNotBlank() },
+            )
+        } catch (e: Exception) {
+            LarktunPingSample(
+                index = index,
+                connectionMode = LarktunPingConnectionMode.NOT_CONNECTED,
+                errorMessage = e.message ?: "Ping failed",
+            )
+        }
+    }
+
+    fun connectLarktunPeerSsh(
+        peer: LarktunTailnetPeer,
+        username: String,
+        password: String,
+        rememberPassword: Boolean,
+        keyId: String?,
+    ) {
+        val profile = larktunSshProfile(peer, username, keyId)
+        if (profile == null) {
+            _error.value = "No address available for ${peer.bestName}"
+            return
+        }
+        connect(profile, password, rememberPassword = rememberPassword)
+    }
+
+    fun forgetLarktunSshCredential(credential: LarktunSshCredential) {
+        viewModelScope.launch {
+            larktunAccountRepository.forgetSshCredential(
+                host = credential.host,
+                port = credential.port,
+                username = credential.username,
+            )
+        }
+    }
+
+    private fun larktunSshProfile(
+        peer: LarktunTailnetPeer,
+        username: String,
+        keyId: String?,
+    ): ConnectionProfile? {
         val host = peer.bestAddress ?: return null
         return ConnectionProfile(
             id = "larktun-${java.util.UUID.randomUUID()}",
             label = peer.bestName,
             host = host,
             port = 22,
-            username = "",
+            username = username.trim(),
+            authType = if (keyId == null) {
+                ConnectionProfile.AuthType.PASSWORD
+            } else {
+                ConnectionProfile.AuthType.KEY
+            },
+            keyId = keyId,
+            sessionManager = SessionManager.NONE.name,
             tunnelConfigId = LarktunTailnetManager.SHARED_TUNNEL_CONFIG_ID,
         )
     }
@@ -1558,6 +1650,8 @@ class ConnectionsViewModel @Inject constructor(
         usernameOverride: String? = null,
     ) {
         val effectiveUsername = usernameOverride?.takeIf { it.isNotBlank() } ?: profile.username
+        val isLarktunRuntimeProfile =
+            profile.tunnelConfigId == LarktunTailnetManager.SHARED_TUNNEL_CONFIG_ID
         viewModelScope.launch {
             _connectingProfileId.value = profile.id
             _error.value = null
@@ -1672,14 +1766,36 @@ class ConnectionsViewModel @Inject constructor(
                 }
 
                 // No existing sessions or no session manager — proceed directly
-                finishConnect(sessionId, profile.id, verboseLog = verboseLogger?.drain())
+                finishConnect(
+                    sessionId,
+                    profile.id,
+                    verboseLog = verboseLogger?.drain(),
+                    persistProfileState = !isLarktunRuntimeProfile,
+                )
 
                 // Save or clear remembered password after successful connect.
                 // Skip if the username came from a runtime prompt — the profile is
                 // explicitly multi-user and persisting one user's password would
                 // bleed it into other sessions.
                 val multiUserProfile = usernameOverride != null
-                if (!multiUserProfile) {
+                if (isLarktunRuntimeProfile) {
+                    if (profile.keyId == null) {
+                        if (rememberPassword == true && password.isNotBlank()) {
+                            larktunAccountRepository.saveSshCredential(
+                                host = profile.host,
+                                port = profile.port,
+                                username = effectiveUsername,
+                                password = password,
+                            )
+                        } else if (rememberPassword == false) {
+                            larktunAccountRepository.forgetSshCredential(
+                                host = profile.host,
+                                port = profile.port,
+                                username = effectiveUsername,
+                            )
+                        }
+                    }
+                } else if (!multiUserProfile) {
                     if (rememberPassword == true && password.isNotBlank()) {
                         repository.save(profile.copy(sshPassword = password))
                     } else if (rememberPassword == false && profile.sshPassword != null) {
@@ -1693,7 +1809,14 @@ class ConnectionsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "connectSsh failed for ${profile.label}: ${e.message}", e)
-                connectionLogRepository.logEvent(profile.id, ConnectionLog.Status.FAILED, details = e.message, verboseLog = verboseLogger?.drain())
+                if (!isLarktunRuntimeProfile) {
+                    connectionLogRepository.logEvent(
+                        profile.id,
+                        ConnectionLog.Status.FAILED,
+                        details = e.message,
+                        verboseLog = verboseLogger?.drain(),
+                    )
+                }
                 sshSessionManager.updateStatus(sessionId, SshSessionManager.SessionState.Status.ERROR)
                 sshSessionManager.removeSession(sessionId)
                 // Clean up auto-created jump session if the final host failed
@@ -2471,7 +2594,13 @@ class ConnectionsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun finishConnect(sessionId: String, profileId: String, verboseLog: String? = pendingVerboseLogs.remove(sessionId), silent: Boolean = false) {
+    private suspend fun finishConnect(
+        sessionId: String,
+        profileId: String,
+        verboseLog: String? = pendingVerboseLogs.remove(sessionId),
+        silent: Boolean = false,
+        persistProfileState: Boolean = true,
+    ) {
         withContext(Dispatchers.IO) {
             sshSessionManager.openShellForSession(sessionId)
 
@@ -2485,21 +2614,25 @@ class ConnectionsViewModel @Inject constructor(
             }
         }
         sshSessionManager.updateStatus(sessionId, SshSessionManager.SessionState.Status.CONNECTED)
-        repository.markConnected(profileId)
+        if (persistProfileState) {
+            repository.markConnected(profileId)
+        }
         // Persist all open session names for this profile (pipe-delimited)
-        sshSessionManager.getSession(sessionId)?.let { session ->
-            if (session.sessionManager != SessionManager.NONE) {
-                // Collect session names from all sessions for this profile
-                val allNames = sshSessionManager.sessions.value.values
-                    .filter { it.profileId == profileId && it.chosenSessionName != null }
-                    .map { it.chosenSessionName!!.replace(Regex("[^A-Za-z0-9._-]"), "-") }
-                    .toMutableList()
-                // Add the current session if not already included
-                val currentName = (session.chosenSessionName ?: session.label ?: sessionId.take(8))
-                    .replace(Regex("[^A-Za-z0-9._-]"), "-")
-                if (currentName !in allNames) allNames.add(currentName)
-                repository.getById(profileId)?.let { profile ->
-                    repository.save(profile.copy(lastSessionName = allNames.joinToString("|")))
+        if (persistProfileState) {
+            sshSessionManager.getSession(sessionId)?.let { session ->
+                if (session.sessionManager != SessionManager.NONE) {
+                    // Collect session names from all sessions for this profile
+                    val allNames = sshSessionManager.sessions.value.values
+                        .filter { it.profileId == profileId && it.chosenSessionName != null }
+                        .map { it.chosenSessionName!!.replace(Regex("[^A-Za-z0-9._-]"), "-") }
+                        .toMutableList()
+                    // Add the current session if not already included
+                    val currentName = (session.chosenSessionName ?: session.label ?: sessionId.take(8))
+                        .replace(Regex("[^A-Za-z0-9._-]"), "-")
+                    if (currentName !in allNames) allNames.add(currentName)
+                    repository.getById(profileId)?.let { profile ->
+                        repository.save(profile.copy(lastSessionName = allNames.joinToString("|")))
+                    }
                 }
             }
         }
@@ -2511,7 +2644,9 @@ class ConnectionsViewModel @Inject constructor(
                 is ConnectionConfig.AuthMethod.FidoKey -> "FIDO2"
             }
         }
-        connectionLogRepository.logEvent(profileId, ConnectionLog.Status.CONNECTED, details = authDetail, verboseLog = verboseLog)
+        if (persistProfileState) {
+            connectionLogRepository.logEvent(profileId, ConnectionLog.Status.CONNECTED, details = authDetail, verboseLog = verboseLog)
+        }
         startForegroundServiceIfNeeded()
         if (!silent) {
             _navigateToTerminal.value = profileId

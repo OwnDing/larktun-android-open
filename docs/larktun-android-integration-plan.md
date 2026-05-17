@@ -115,13 +115,20 @@ Current action scope:
 
 - Tap or long-press a Larktun device to open a menu using the same `DropdownMenu` style as the existing manual connection rows.
 - Menu entries should include:
-  - `Ping`: run an app-only tsnet ping against the peer's primary Tailscale IP and show latency/route feedback.
-  - `SSH`: create an ephemeral SSH profile for the selected peer and connect through the logged-in Larktun app-only runtime. The user supplies SSH username and authentication details through the existing password/key dialog.
+  - `Ping`: open a Larktun ping sheet, run 10 app-only tsnet ping samples against the peer's primary Tailscale IP, and render the samples as a latency chart with the latest route mode (`Direct`, `DERP`, `Peer relay`, `TSMP`, or `Not connected`).
+  - `SSH`: open a Larktun-specific SSH dialog, matching the iOS flow with `Password` and `SSH key` auth modes. Password mode supports saved Larktun device credentials and a remember-password checkbox. Key mode uses the existing Android `Keys` repository and asks for a passphrase when the selected key is encrypted.
   - `Open Web`: open the peer's HTTP service through a short-lived loopback reverse proxy so the Android browser talks to `127.0.0.1`, while the app forwards bytes to the peer through tsnet. Default to port `80` for the first pass. This keeps web browsing app-only and does not require system VPN.
   - `Copy Address`: copy MagicDNS name or primary Tailscale IP.
 - Larktun peer actions must not mutate or delete the live peer list.
 - Larktun peer actions should not create manual `ConnectionProfile` rows unless the user explicitly chooses a future `Save as connection` action.
 - When an action requires a running Larktun runtime, show a clear error if the user has signed out or the runtime is still starting.
+
+Larktun SSH credentials are account-scoped app credentials, not manual connection credentials:
+
+- The selected peer is connected through an ephemeral `ConnectionProfile` that points at the shared logged-in Larktun tsnet runtime.
+- Successful remembered passwords are stored in the encrypted Larktun account repository keyed by `host + port + username`.
+- Ephemeral Larktun SSH profiles are not inserted into the Room `ConnectionProfile` table and do not write manual connection history or connection logs.
+- Signing out of Larktun clears the saved Larktun SSH credentials together with the account session.
 
 Optional actions after the first working pass:
 
@@ -204,8 +211,9 @@ Sign out should:
 ### Phase 6: Device Connection Actions
 
 - Add a Larktun device menu matching the existing manual connection dropdown style.
-- Implement Ping through the Go `tsbridge` runtime and surface the result in a toast/snackbar.
-- Implement SSH by using the existing Android SSH password/key dialog with a special shared Larktun tunnel route, so the peer connection reuses the logged-in app-only tsnet runtime.
+- Implement Ping through the Go `tsbridge` runtime and surface 10 samples in a bottom-sheet latency chart.
+- Implement SSH with a Larktun-specific password/key dialog and a special shared Larktun tunnel route, so the peer connection reuses the logged-in app-only tsnet runtime.
+- Store remembered Larktun SSH passwords in encrypted account-scoped preferences, separate from manual `ConnectionProfile` passwords.
 - Implement Open Web with a loopback reverse proxy backed by the shared Larktun tunnel. The proxy should be replaced when another peer is opened and cleaned up automatically after a short idle window.
 - Add `Save as connection` after the temporary connection path is stable.
 

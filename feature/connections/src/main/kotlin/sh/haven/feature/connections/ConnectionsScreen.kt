@@ -181,12 +181,15 @@ fun ConnectionsScreen(
     val larktunAuthBusy by viewModel.larktunAuthBusy.collectAsState()
     val larktunAuthError by viewModel.larktunAuthError.collectAsState()
     val larktunTailnetStatus by viewModel.larktunTailnetStatus.collectAsState()
+    val larktunSshCredentials by viewModel.larktunSshCredentials.collectAsState()
     val groups by viewModel.groups.collectAsState()
     val sshKeys by viewModel.sshKeys.collectAsState()
     val tunnelConfigs by viewModel.tunnelConfigs.collectAsState()
     var showTunnelsScreen by remember { mutableStateOf(false) }
     var showDesktopsScreen by remember { mutableStateOf(false) }
     var showLarktunAccount by rememberSaveable { mutableStateOf(false) }
+    var larktunPingPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
+    var larktunSshPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
     val profileStatuses by viewModel.profileStatuses.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
 
@@ -594,6 +597,34 @@ fun ConnectionsScreen(
                 )
                 connectingProfile = null
             },
+        )
+    }
+
+    larktunPingPeer?.let { peer ->
+        LarktunPingSheet(
+            peer = peer,
+            onDismiss = { larktunPingPeer = null },
+            pingSample = viewModel::pingLarktunPeerSample,
+        )
+    }
+
+    larktunSshPeer?.let { peer ->
+        LarktunSshDialog(
+            peer = peer,
+            sshKeys = sshKeys,
+            savedCredentials = larktunSshCredentials,
+            onDismiss = { larktunSshPeer = null },
+            onConnect = { username, password, rememberPassword, keyId ->
+                viewModel.connectLarktunPeerSsh(
+                    peer = peer,
+                    username = username,
+                    password = password,
+                    rememberPassword = rememberPassword,
+                    keyId = keyId,
+                )
+                larktunSshPeer = null
+            },
+            onForgetCredential = viewModel::forgetLarktunSshCredential,
         )
     }
 
@@ -1189,13 +1220,12 @@ fun ConnectionsScreen(
                             LarktunTailnetDevicesSection(
                                 status = larktunTailnetStatus,
                                 onRefresh = viewModel::refreshLarktunTailnetStatus,
-                                onPing = viewModel::pingLarktunPeer,
+                                onPing = { peer -> larktunPingPeer = peer },
                                 onSsh = { peer ->
-                                    val profile = viewModel.larktunSshProfile(peer)
-                                    if (profile == null) {
+                                    if (peer.bestAddress == null) {
                                         viewModel.showError(context.getString(R.string.connections_larktun_no_address))
                                     } else {
-                                        connectingProfile = profile
+                                        larktunSshPeer = peer
                                     }
                                 },
                                 onOpenWeb = { peer ->

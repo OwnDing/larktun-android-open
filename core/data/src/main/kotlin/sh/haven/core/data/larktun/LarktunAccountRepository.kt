@@ -9,9 +9,20 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 import sh.haven.core.security.CredentialEncryption
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class LarktunSshCredential(
+    val id: String,
+    val host: String,
+    val port: Int,
+    val username: String,
+    val password: String,
+    val updatedAt: Long,
+)
 
 @Singleton
 class LarktunAccountRepository @Inject constructor(
@@ -25,9 +36,14 @@ class LarktunAccountRepository @Inject constructor(
     private val accountJsonKey = stringPreferencesKey("larktun_account_json")
     private val entitlementJsonKey = stringPreferencesKey("larktun_entitlement_json")
     private val createdAtKey = longPreferencesKey("larktun_session_created_at")
+    private val sshCredentialsJsonKey = stringPreferencesKey("larktun_ssh_credentials_json")
 
     val session: Flow<LarktunSession?> = dataStore.data.map { prefs ->
         decodeSession(prefs)
+    }
+
+    val sshCredentials: Flow<List<LarktunSshCredential>> = dataStore.data.map { prefs ->
+        decodeSshCredentials(prefs[sshCredentialsJsonKey])
     }
 
     suspend fun fetchCaptcha(): LarktunCaptcha = authClient.fetchCaptcha()
@@ -83,6 +99,49 @@ class LarktunAccountRepository @Inject constructor(
             prefs.remove(accountJsonKey)
             prefs.remove(entitlementJsonKey)
             prefs.remove(createdAtKey)
+            prefs.remove(sshCredentialsJsonKey)
+        }
+    }
+
+    suspend fun saveSshCredential(host: String, port: Int, username: String, password: String) {
+        val cleanHost = host.trim()
+        val cleanUsername = username.trim()
+        if (cleanHost.isBlank() || cleanUsername.isBlank() || password.isBlank()) return
+
+        dataStore.edit { prefs ->
+            val existing = decodeSshCredentials(prefs[sshCredentialsJsonKey])
+                .filterNot {
+                    it.host.equals(cleanHost, ignoreCase = true) &&
+                        it.port == port &&
+                        it.username == cleanUsername
+                }
+            val next = existing + LarktunSshCredential(
+                id = sshCredentialId(cleanHost, port, cleanUsername),
+                host = cleanHost,
+                port = port,
+                username = cleanUsername,
+                password = password,
+                updatedAt = System.currentTimeMillis(),
+            )
+            prefs[sshCredentialsJsonKey] = encodeSshCredentials(next)
+        }
+    }
+
+    suspend fun forgetSshCredential(host: String, port: Int, username: String) {
+        val cleanHost = host.trim()
+        val cleanUsername = username.trim()
+        dataStore.edit { prefs ->
+            val next = decodeSshCredentials(prefs[sshCredentialsJsonKey])
+                .filterNot {
+                    it.host.equals(cleanHost, ignoreCase = true) &&
+                        it.port == port &&
+                        it.username == cleanUsername
+                }
+            if (next.isEmpty()) {
+                prefs.remove(sshCredentialsJsonKey)
+            } else {
+                prefs[sshCredentialsJsonKey] = encodeSshCredentials(next)
+            }
         }
     }
 
@@ -119,4 +178,55 @@ class LarktunAccountRepository @Inject constructor(
             createdAt = prefs[createdAtKey] ?: 0L,
         )
     }
+
+    private fun encodeSshCredentials(credentials: List<LarktunSshCredential>): String {
+        val array = JSONArray()
+        credentials
+            .sortedByDescending { it.updatedAt }
+            .take(20)
+            .forEach { credential ->
+                array.put(
+                    JSONObject()
+                        .put("id", credential.id)
+                        .put("host", credential.host)
+                        .put("port", credential.port)
+                        .put("username", credential.username)
+                        .put("password", CredentialEncryption.encrypt(context, credential.password))
+                        .put("updatedAt", credential.updatedAt),
+                )
+            }
+        return array.toString()
+    }
+
+    private fun decodeSshCredentials(json: String?): List<LarktunSshCredential> {
+        if (json.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(json)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val obj = array.optJSONObject(index) ?: continue
+                    val host = obj.optString("host").trim()
+                    val username = obj.optString("username").trim()
+                    val encryptedPassword = obj.optString("password").takeIf { it.isNotBlank() }
+                    if (host.isBlank() || username.isBlank() || encryptedPassword == null) continue
+                    val port = obj.optInt("port", 22)
+                    add(
+                        LarktunSshCredential(
+                            id = obj.optString("id")
+                                .takeIf { it.isNotBlank() }
+                                ?: sshCredentialId(host, port, username),
+                            host = host,
+                            port = port,
+                            username = username,
+                            password = CredentialEncryption.decrypt(context, encryptedPassword),
+                            updatedAt = obj.optLong("updatedAt", 0L),
+                        ),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun sshCredentialId(host: String, port: Int, username: String): String =
+        listOf(host.lowercase(), port.toString(), username).joinToString("|")
 }
