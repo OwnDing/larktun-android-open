@@ -65,6 +65,13 @@
     <string name="connections_larktun_device_active">Active</string>
     <string name="connections_larktun_device_online">Online</string>
     <string name="connections_larktun_device_offline">Offline</string>
+    <string name="connections_larktun_action_ping">Ping</string>
+    <string name="connections_larktun_action_ssh">SSH</string>
+    <string name="connections_larktun_action_open_web">Open Web</string>
+    <string name="connections_larktun_action_copy_address">Copy Address</string>
+    <string name="connections_larktun_address_copied">Address copied</string>
+    <string name="connections_larktun_no_address">No address available for this device</string>
+    <string name="connections_larktun_web_open_failed">Failed to open web browser</string>
 
     <!-- Empty state -->
     <string name="connections_empty_title">No connections yet</string>

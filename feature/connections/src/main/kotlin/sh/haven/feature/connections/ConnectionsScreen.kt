@@ -1,6 +1,8 @@
 package sh.haven.feature.connections
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -57,6 +59,7 @@ import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material.icons.filled.Laptop
@@ -1186,6 +1189,43 @@ fun ConnectionsScreen(
                             LarktunTailnetDevicesSection(
                                 status = larktunTailnetStatus,
                                 onRefresh = viewModel::refreshLarktunTailnetStatus,
+                                onPing = viewModel::pingLarktunPeer,
+                                onSsh = { peer ->
+                                    val profile = viewModel.larktunSshProfile(peer)
+                                    if (profile == null) {
+                                        viewModel.showError(context.getString(R.string.connections_larktun_no_address))
+                                    } else {
+                                        connectingProfile = profile
+                                    }
+                                },
+                                onOpenWeb = { peer ->
+                                    scope.launch {
+                                        try {
+                                            val url = viewModel.openLarktunPeerWeb(peer)
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        } catch (e: Exception) {
+                                            viewModel.showError(
+                                                e.message ?: context.getString(R.string.connections_larktun_web_open_failed),
+                                            )
+                                        }
+                                    }
+                                },
+                                onCopyAddress = { peer ->
+                                    val address = peer.bestAddress
+                                    if (address == null) {
+                                        viewModel.showError(context.getString(R.string.connections_larktun_no_address))
+                                    } else {
+                                        context.getSystemService(ClipboardManager::class.java)
+                                            ?.setPrimaryClip(
+                                                ClipData.newPlainText(peer.bestName, address),
+                                            )
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            context.getString(R.string.connections_larktun_address_copied),
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                },
                             )
                         }
                     }
@@ -1364,6 +1404,10 @@ fun ConnectionsScreen(
 private fun LarktunTailnetDevicesSection(
     status: LarktunTailnetStatus,
     onRefresh: () -> Unit,
+    onPing: (LarktunTailnetPeer) -> Unit,
+    onSsh: (LarktunTailnetPeer) -> Unit,
+    onOpenWeb: (LarktunTailnetPeer) -> Unit,
+    onCopyAddress: (LarktunTailnetPeer) -> Unit,
 ) {
     val peers = remember(status.peers) {
         status.peers
@@ -1444,7 +1488,13 @@ private fun LarktunTailnetDevicesSection(
                         if (index > 0) {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
-                        LarktunTailnetPeerRow(peer = peer)
+                        LarktunTailnetPeerRow(
+                            peer = peer,
+                            onPing = onPing,
+                            onSsh = onSsh,
+                            onOpenWeb = onOpenWeb,
+                            onCopyAddress = onCopyAddress,
+                        )
                     }
                 }
             }
@@ -1452,8 +1502,15 @@ private fun LarktunTailnetDevicesSection(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LarktunTailnetPeerRow(peer: LarktunTailnetPeer) {
+private fun LarktunTailnetPeerRow(
+    peer: LarktunTailnetPeer,
+    onPing: (LarktunTailnetPeer) -> Unit,
+    onSsh: (LarktunTailnetPeer) -> Unit,
+    onOpenWeb: (LarktunTailnetPeer) -> Unit,
+    onCopyAddress: (LarktunTailnetPeer) -> Unit,
+) {
     val statusLabel = when {
         peer.active -> stringResource(R.string.connections_larktun_device_active)
         peer.online -> stringResource(R.string.connections_larktun_device_online)
@@ -1463,40 +1520,82 @@ private fun LarktunTailnetPeerRow(peer: LarktunTailnetPeer) {
         peer.active || peer.online -> Color(0xFF2E7D32)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    ListItem(
-        leadingContent = {
-            Icon(Icons.Filled.Laptop, contentDescription = null)
-        },
-        headlineContent = {
-            Text(peer.bestName)
-        },
-        supportingContent = {
-            Text(
-                listOfNotNull(
-                    peer.bestAddress,
-                    peer.os?.takeIf { it.isNotBlank() },
-                ).joinToString("  |  "),
-            )
-        },
-        trailingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Circle,
-                    contentDescription = null,
-                    modifier = Modifier.size(10.dp),
-                    tint = statusColor,
-                )
+    val hasAddress = peer.bestAddress != null
+    val hasPingAddress = peer.primaryTailscaleIP != null
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        ListItem(
+            leadingContent = {
+                Icon(Icons.Filled.Laptop, contentDescription = null)
+            },
+            headlineContent = {
+                Text(peer.bestName)
+            },
+            supportingContent = {
                 Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = statusColor,
+                    listOfNotNull(
+                        peer.bestAddress,
+                        peer.os?.takeIf { it.isNotBlank() },
+                    ).joinToString("  |  "),
                 )
-            }
-        },
-    )
+            },
+            trailingContent = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Circle,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = statusColor,
+                    )
+                    Text(
+                        text = statusLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = statusColor,
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = { showMenu = true },
+                    onLongClick = { showMenu = true },
+                ),
+        )
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.connections_larktun_action_ping)) },
+                leadingIcon = { Icon(Icons.Filled.SyncAlt, null) },
+                enabled = hasPingAddress,
+                onClick = { showMenu = false; onPing(peer) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.connections_larktun_action_ssh)) },
+                leadingIcon = { Icon(Icons.Filled.Terminal, null) },
+                enabled = hasAddress,
+                onClick = { showMenu = false; onSsh(peer) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.connections_larktun_action_open_web)) },
+                leadingIcon = { Icon(Icons.Filled.Public, null) },
+                enabled = hasAddress,
+                onClick = { showMenu = false; onOpenWeb(peer) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.connections_larktun_action_copy_address)) },
+                leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
+                enabled = hasAddress,
+                onClick = { showMenu = false; onCopyAddress(peer) },
+            )
+        }
+    }
 }
 
 @Composable

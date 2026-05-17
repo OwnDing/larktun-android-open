@@ -28,6 +28,10 @@ import sh.haven.core.data.larktun.LarktunSession
 class LarktunTailnetManager @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    companion object {
+        const val SHARED_TUNNEL_CONFIG_ID = "__larktun_account_tailnet__"
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
 
@@ -37,6 +41,7 @@ class LarktunTailnetManager @Inject constructor(
     private var currentSessionKey: String? = null
     private var tunnel: TailscaleTunnel? = null
     private var pollingJob: Job? = null
+    private var webProxy: LarktunHttpProxy? = null
 
     suspend fun applySession(session: LarktunSession?) {
         if (session == null) {
@@ -48,6 +53,44 @@ class LarktunTailnetManager @Inject constructor(
 
     suspend fun refresh() {
         refreshStatus()
+    }
+
+    suspend fun getRunningTunnel(): Tunnel? = mutex.withLock { tunnel }
+
+    suspend fun ping(address: String, timeoutMs: Int = 3_000): LarktunPingResult {
+        val snapshot = mutex.withLock { tunnel }
+            ?: throw IllegalStateException("Larktun network is not running")
+        return withContext(Dispatchers.IO) {
+            LarktunPingResult.fromJson(snapshot.pingJson(address, timeoutMs))
+        }
+    }
+
+    suspend fun startWebProxy(host: String, port: Int = 80): String {
+        val snapshot = mutex.withLock { tunnel }
+            ?: throw IllegalStateException("Larktun network is not running")
+        val proxy = LarktunHttpProxy(
+            tunnel = snapshot,
+            remoteHost = host,
+            remotePort = port,
+            scope = scope,
+        )
+        val url = withContext(Dispatchers.IO) {
+            proxy.start()
+        }
+        mutex.withLock {
+            webProxy?.close()
+            webProxy = proxy
+        }
+        scope.launch {
+            delay(10 * 60 * 1_000L)
+            mutex.withLock {
+                if (webProxy === proxy) {
+                    webProxy?.close()
+                    webProxy = null
+                }
+            }
+        }
+        return url
     }
 
     private suspend fun start(session: LarktunSession) = mutex.withLock {
@@ -96,6 +139,8 @@ class LarktunTailnetManager @Inject constructor(
     private fun stopLocked() {
         pollingJob?.cancel()
         pollingJob = null
+        webProxy?.close()
+        webProxy = null
         try {
             tunnel?.close()
         } catch (_: Throwable) {

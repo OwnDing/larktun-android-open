@@ -29,19 +29,28 @@ import "C"
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
+	"tailscale.com/client/local"
+	"tailscale.com/ipn"
+	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/net/netmon"
+	"tailscale.com/tailcfg"
 	"tailscale.com/tsnet"
+	"tailscale.com/types/netmap"
 )
+
+const nodeAliasCapability = "sh.larktun.alias"
 
 // init wires an Android-safe interface enumerator into tsnet's
 // RegisterInterfaceGetter hook. Tailscale added this hook specifically
@@ -241,6 +250,61 @@ type Conn struct {
 	c net.Conn
 }
 
+type statusPayload struct {
+	Status          string        `json:"status"`
+	BackendState    string        `json:"backendState,omitempty"`
+	Hostname        string        `json:"hostname,omitempty"`
+	SelfDisplayName string        `json:"selfDisplayName,omitempty"`
+	SelfAliasName   string        `json:"selfAliasName,omitempty"`
+	TailscaleIPs    []string      `json:"tailscaleIPs"`
+	SelfDNSName     string        `json:"selfDNSName,omitempty"`
+	TailnetName     string        `json:"tailnetName,omitempty"`
+	MagicDNSSuffix  string        `json:"magicDNSSuffix,omitempty"`
+	MagicDNSEnabled bool          `json:"magicDNSEnabled,omitempty"`
+	PeerCount       int           `json:"peerCount"`
+	Peers           []peerPayload `json:"peers"`
+	LastError       string        `json:"lastError,omitempty"`
+	UpdatedAt       string        `json:"updatedAt"`
+}
+
+type peerPayload struct {
+	ID             string   `json:"id"`
+	PublicKey      string   `json:"publicKey,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	ComputedName   string   `json:"computedName,omitempty"`
+	DisplayName    string   `json:"displayName,omitempty"`
+	AliasName      string   `json:"aliasName,omitempty"`
+	HostName       string   `json:"hostName,omitempty"`
+	DNSName        string   `json:"dnsName,omitempty"`
+	OS             string   `json:"os,omitempty"`
+	TailscaleIPs   []string `json:"tailscaleIPs"`
+	Online         bool     `json:"online"`
+	Active         bool     `json:"active"`
+	ExitNode       bool     `json:"exitNode"`
+	ExitNodeOption bool     `json:"exitNodeOption"`
+	CurAddr        string   `json:"curAddr,omitempty"`
+	LastSeen       string   `json:"lastSeen,omitempty"`
+	LastHandshake  string   `json:"lastHandshake,omitempty"`
+	Relay          string   `json:"relay,omitempty"`
+	PeerRelay      string   `json:"peerRelay,omitempty"`
+	KeyExpiry      string   `json:"keyExpiry,omitempty"`
+}
+
+type pingPayload struct {
+	IP             string  `json:"ip,omitempty"`
+	NodeIP         string  `json:"nodeIP,omitempty"`
+	NodeName       string  `json:"nodeName,omitempty"`
+	Error          string  `json:"error,omitempty"`
+	LatencySeconds float64 `json:"latencySeconds,omitempty"`
+	Endpoint       string  `json:"endpoint,omitempty"`
+	PeerRelay      string  `json:"peerRelay,omitempty"`
+	DERPRegionID   int     `json:"derpRegionID,omitempty"`
+	DERPRegionCode string  `json:"derpRegionCode,omitempty"`
+	PeerAPIPort    uint16  `json:"peerAPIPort,omitempty"`
+	PeerAPIURL     string  `json:"peerAPIURL,omitempty"`
+	IsLocalIP      bool    `json:"isLocalIP,omitempty"`
+}
+
 // StartTunnel brings up a tailnet using the given authkey and state
 // directory. hostname is advertised to the tailnet (shows up in the
 // admin console); blank picks tsnet's default.
@@ -358,6 +422,125 @@ func (t *TunnelHandle) Dial(host string, port int, timeoutMs int) (*Conn, error)
 	return &Conn{c: c}, nil
 }
 
+// StatusJSON returns a compact tailnet status snapshot for Android UI code.
+// It intentionally mirrors the iOS AppEngine payload shape so both clients
+// can render Larktun device rows from the same fields.
+func (t *TunnelHandle) StatusJSON() string {
+	payload := t.statusPayload()
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf(`{"status":"failed","lastError":%q}`, err.Error())
+	}
+	return string(data)
+}
+
+// PingJSON runs a TSMP ping through the app-only tsnet runtime and returns
+// a compact JSON payload for the Android Larktun device menu.
+func (t *TunnelHandle) PingJSON(ip string, timeoutMs int) (string, error) {
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return "", errors.New("tunnel closed")
+	}
+	srv := t.srv
+	t.mu.Unlock()
+	if srv == nil {
+		return "", errors.New("tunnel not started")
+	}
+
+	addr, err := netip.ParseAddr(strings.TrimSpace(ip))
+	if err != nil {
+		return "", fmt.Errorf("parse ping address %q: %w", ip, err)
+	}
+	if timeoutMs <= 0 {
+		timeoutMs = 3_000
+	}
+
+	lc, err := srv.LocalClient()
+	if err != nil {
+		return "", fmt.Errorf("LocalClient: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Duration(timeoutMs)*time.Millisecond,
+	)
+	defer cancel()
+	result, err := lc.Ping(ctx, addr, tailcfg.PingTSMP)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.Marshal(pingPayloadFromResult(result))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (t *TunnelHandle) statusPayload() statusPayload {
+	payload := statusPayload{
+		Status:       "idle",
+		TailscaleIPs: []string{},
+		Peers:        []peerPayload{},
+		UpdatedAt:    time.Now().Format(time.RFC3339),
+	}
+
+	t.mu.Lock()
+	closed := t.closed
+	srv := t.srv
+	t.mu.Unlock()
+	if closed || srv == nil {
+		payload.LastError = "tunnel closed"
+		return payload
+	}
+
+	payload.Status = "running"
+	lc, err := srv.LocalClient()
+	if err != nil {
+		payload.LastError = err.Error()
+		return payload
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	status, err := lc.Status(ctx)
+	if err != nil {
+		payload.LastError = err.Error()
+		return payload
+	}
+	applyIPNStatus(&payload, status)
+
+	netMap, err := currentNetworkMap(ctx, lc)
+	if err != nil {
+		payload.LastError = err.Error()
+		return payload
+	}
+	applyNetworkMap(&payload, netMap)
+	return payload
+}
+
+func pingPayloadFromResult(result *ipnstate.PingResult) pingPayload {
+	if result == nil {
+		return pingPayload{Error: "empty ping result"}
+	}
+	return pingPayload{
+		IP:             result.IP,
+		NodeIP:         result.NodeIP,
+		NodeName:       result.NodeName,
+		Error:          result.Err,
+		LatencySeconds: result.LatencySeconds,
+		Endpoint:       result.Endpoint,
+		PeerRelay:      result.PeerRelay,
+		DERPRegionID:   result.DERPRegionID,
+		DERPRegionCode: result.DERPRegionCode,
+		PeerAPIPort:    result.PeerAPIPort,
+		PeerAPIURL:     result.PeerAPIURL,
+		IsLocalIP:      result.IsLocalIP,
+	}
+}
+
 // Close tears down the tailnet connection. The state directory is kept
 // intact so a subsequent StartTunnel picks up without re-auth.
 func (t *TunnelHandle) Close() {
@@ -371,6 +554,368 @@ func (t *TunnelHandle) Close() {
 		_ = t.srv.Close()
 		t.srv = nil
 	}
+}
+
+func applyIPNStatus(payload *statusPayload, status *ipnstate.Status) {
+	if payload == nil || status == nil {
+		return
+	}
+
+	payload.BackendState = status.BackendState
+	payload.TailscaleIPs = payload.TailscaleIPs[:0]
+	for _, ip := range status.TailscaleIPs {
+		payload.TailscaleIPs = append(payload.TailscaleIPs, ip.String())
+	}
+	if status.Self != nil {
+		payload.SelfDNSName = strings.TrimSuffix(status.Self.DNSName, ".")
+	}
+	if status.CurrentTailnet != nil {
+		payload.TailnetName = status.CurrentTailnet.Name
+		payload.MagicDNSSuffix = status.CurrentTailnet.MagicDNSSuffix
+		payload.MagicDNSEnabled = status.CurrentTailnet.MagicDNSEnabled
+	}
+	payload.PeerCount = len(status.Peer)
+	payload.Peers = payload.Peers[:0]
+	for _, peerKey := range status.Peers() {
+		peer := status.Peer[peerKey]
+		if peer == nil {
+			continue
+		}
+		payload.Peers = append(payload.Peers, peerPayloadFromStatus(peerKey.String(), peer))
+	}
+	payload.PeerCount = len(payload.Peers)
+}
+
+func currentNetworkMap(ctx context.Context, lc *local.Client) (*netmap.NetworkMap, error) {
+	watcher, err := lc.WatchIPNBus(ctx, ipn.NotifyInitialNetMap|ipn.NotifyNoPrivateKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer watcher.Close()
+
+	for {
+		notify, err := watcher.Next()
+		if err != nil {
+			return nil, err
+		}
+		if notify.NetMap != nil {
+			return notify.NetMap, nil
+		}
+	}
+}
+
+func applyNetworkMap(payload *statusPayload, nm *netmap.NetworkMap) {
+	if payload == nil || nm == nil {
+		return
+	}
+
+	if payload.TailnetName == "" {
+		payload.TailnetName = nm.DomainName()
+	}
+	if payload.MagicDNSSuffix == "" {
+		payload.MagicDNSSuffix = nm.MagicDNSSuffix()
+	}
+	if nm.SelfNode.Valid() {
+		applySelfNode(payload, nm.SelfNode)
+	}
+
+	peerIndex := make(map[string]int, len(payload.Peers)*2)
+	for index, peer := range payload.Peers {
+		if peer.ID != "" {
+			peerIndex[peer.ID] = index
+		}
+		if peer.PublicKey != "" {
+			peerIndex[peer.PublicKey] = index
+		}
+	}
+
+	for _, node := range nm.Peers {
+		if !node.Valid() {
+			continue
+		}
+
+		index, ok := peerIndex[string(node.StableID())]
+		if !ok {
+			index, ok = peerIndex[node.Key().String()]
+		}
+		if ok {
+			applyNodeToPeerPayload(&payload.Peers[index], node)
+			continue
+		}
+
+		peer := peerPayloadFromNode(node)
+		payload.Peers = append(payload.Peers, peer)
+		if peer.ID != "" {
+			peerIndex[peer.ID] = len(payload.Peers) - 1
+		}
+		if peer.PublicKey != "" {
+			peerIndex[peer.PublicKey] = len(payload.Peers) - 1
+		}
+	}
+	payload.PeerCount = len(payload.Peers)
+}
+
+func applySelfNode(payload *statusPayload, node tailcfg.NodeView) {
+	displayName := nodeDisplayName(node)
+	if displayName != "" {
+		payload.SelfDisplayName = displayName
+	}
+	if aliasName := nodeAliasName(node); aliasName != "" {
+		payload.SelfAliasName = aliasName
+	}
+	if payload.SelfDNSName == "" {
+		payload.SelfDNSName = nodeDNSName(node)
+	}
+	if len(payload.TailscaleIPs) == 0 {
+		payload.TailscaleIPs = nodeTailscaleIPs(node)
+	}
+}
+
+func peerPayloadFromStatus(publicKey string, peer *ipnstate.PeerStatus) peerPayload {
+	payload := peerPayload{
+		ID:             string(peer.ID),
+		PublicKey:      publicKey,
+		HostName:       peer.HostName,
+		DNSName:        strings.TrimSuffix(peer.DNSName, "."),
+		OS:             peer.OS,
+		TailscaleIPs:   make([]string, 0, len(peer.TailscaleIPs)),
+		Online:         peer.Online,
+		Active:         peer.Active,
+		ExitNode:       peer.ExitNode,
+		ExitNodeOption: peer.ExitNodeOption,
+		CurAddr:        peer.CurAddr,
+		Relay:          peer.Relay,
+		PeerRelay:      peer.PeerRelay,
+		LastSeen:       formatTime(peer.LastSeen),
+		LastHandshake:  formatTime(peer.LastHandshake),
+	}
+	if peer.KeyExpiry != nil {
+		payload.KeyExpiry = formatTime(*peer.KeyExpiry)
+	}
+	if payload.ID == "" {
+		payload.ID = publicKey
+	}
+	for _, ip := range peer.TailscaleIPs {
+		payload.TailscaleIPs = append(payload.TailscaleIPs, ip.String())
+	}
+	return payload
+}
+
+func peerPayloadFromNode(node tailcfg.NodeView) peerPayload {
+	displayName := nodeDisplayName(node)
+	payload := peerPayload{
+		ID:             string(node.StableID()),
+		PublicKey:      node.Key().String(),
+		Name:           nodeName(node),
+		ComputedName:   nodeComputedName(node),
+		DisplayName:    displayName,
+		AliasName:      nodeAliasName(node),
+		HostName:       nodeHostName(node),
+		DNSName:        nodeDNSName(node),
+		OS:             nodeOS(node),
+		TailscaleIPs:   nodeTailscaleIPs(node),
+		Online:         node.Online().GetOr(false),
+		ExitNodeOption: nodeIsExitNode(node),
+		LastSeen:       nodeLastSeen(node),
+		KeyExpiry:      nodeKeyExpiry(node),
+	}
+	if payload.ID == "" {
+		payload.ID = payload.PublicKey
+	}
+	return payload
+}
+
+func applyNodeToPeerPayload(peer *peerPayload, node tailcfg.NodeView) {
+	if peer == nil || !node.Valid() {
+		return
+	}
+
+	if peer.ID == "" {
+		peer.ID = string(node.StableID())
+	}
+	if peer.PublicKey == "" {
+		peer.PublicKey = node.Key().String()
+	}
+	peer.Name = firstNonEmptyString(peer.Name, nodeName(node))
+	peer.ComputedName = firstNonEmptyString(peer.ComputedName, nodeComputedName(node))
+	peer.DisplayName = firstNonEmptyString(peer.DisplayName, nodeDisplayName(node))
+	peer.AliasName = firstNonEmptyString(peer.AliasName, nodeAliasName(node))
+	peer.HostName = firstNonEmptyString(peer.HostName, nodeHostName(node))
+	peer.DNSName = firstNonEmptyString(peer.DNSName, nodeDNSName(node))
+	peer.OS = firstNonEmptyString(peer.OS, nodeOS(node))
+	if len(peer.TailscaleIPs) == 0 {
+		peer.TailscaleIPs = nodeTailscaleIPs(node)
+	}
+	if online, ok := node.Online().GetOk(); ok {
+		peer.Online = online
+	}
+	if !peer.ExitNodeOption {
+		peer.ExitNodeOption = nodeIsExitNode(node)
+	}
+	if peer.LastSeen == "" {
+		peer.LastSeen = nodeLastSeen(node)
+	}
+	if peer.KeyExpiry == "" {
+		peer.KeyExpiry = nodeKeyExpiry(node)
+	}
+}
+
+func nodeName(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(node.Name()), ".")
+}
+
+func nodeComputedName(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(node.ComputedName()), ".")
+}
+
+func nodeAliasName(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+
+	values, ok := node.CapMap().GetOk(nodeAliasCapability)
+	if !ok {
+		return ""
+	}
+
+	for _, rawMessage := range values.All() {
+		if alias := aliasFromRawMessage(rawMessage); alias != "" {
+			return alias
+		}
+	}
+	return ""
+}
+
+func nodeDisplayName(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+	if value := nodeAliasName(node); value != "" {
+		return value
+	}
+	if value := nodeHostName(node); value != "" {
+		return value
+	}
+	if value := nodeComputedName(node); value != "" {
+		return value
+	}
+	if value := nodeName(node); value != "" {
+		return value
+	}
+	return node.Key().String()
+}
+
+func aliasFromRawMessage(raw tailcfg.RawMessage) string {
+	data := []byte(raw)
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return ""
+	}
+
+	var value string
+	if err := json.Unmarshal(data, &value); err == nil {
+		return strings.TrimSpace(value)
+	}
+
+	var values []string
+	if err := json.Unmarshal(data, &values); err == nil {
+		for _, value := range values {
+			if alias := strings.TrimSpace(value); alias != "" {
+				return alias
+			}
+		}
+	}
+
+	fallback := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	if fallback == "null" {
+		return ""
+	}
+	return fallback
+}
+
+func nodeHostName(node tailcfg.NodeView) string {
+	if !node.Valid() || !node.Hostinfo().Valid() {
+		return ""
+	}
+	return strings.TrimSpace(node.Hostinfo().Hostname())
+}
+
+func nodeDNSName(node tailcfg.NodeView) string {
+	return nodeName(node)
+}
+
+func nodeOS(node tailcfg.NodeView) string {
+	if !node.Valid() || !node.Hostinfo().Valid() {
+		return ""
+	}
+	return strings.TrimSpace(node.Hostinfo().OS())
+}
+
+func nodeTailscaleIPs(node tailcfg.NodeView) []string {
+	if !node.Valid() {
+		return []string{}
+	}
+	addresses := node.Addresses()
+	ips := make([]string, 0, addresses.Len())
+	for _, address := range addresses.All() {
+		ips = append(ips, address.Addr().String())
+	}
+	return ips
+}
+
+func nodeIsExitNode(node tailcfg.NodeView) bool {
+	if !node.Valid() {
+		return false
+	}
+	var hasIPv4Default, hasIPv6Default bool
+	for _, allowedIP := range node.AllowedIPs().All() {
+		switch allowedIP.String() {
+		case "0.0.0.0/0":
+			hasIPv4Default = true
+		case "::/0":
+			hasIPv6Default = true
+		}
+	}
+	return hasIPv4Default && hasIPv6Default
+}
+
+func nodeLastSeen(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+	value, ok := node.LastSeen().GetOk()
+	if !ok {
+		return ""
+	}
+	return formatTime(value)
+}
+
+func nodeKeyExpiry(node tailcfg.NodeView) string {
+	if !node.Valid() {
+		return ""
+	}
+	return formatTime(node.KeyExpiry())
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func formatTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }
 
 // Read returns up to size bytes. Signals EOF the same way wgbridge does

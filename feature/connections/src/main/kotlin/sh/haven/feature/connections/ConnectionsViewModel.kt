@@ -53,6 +53,7 @@ import sh.haven.core.data.larktun.LarktunCaptcha
 import sh.haven.core.data.larktun.LarktunConfig
 import sh.haven.core.data.larktun.LarktunSession
 import sh.haven.core.tunnel.LarktunTailnetManager
+import sh.haven.core.tunnel.LarktunTailnetPeer
 import sh.haven.core.tunnel.LarktunTailnetStatus
 import sh.haven.core.mosh.MoshSessionManager
 import sh.haven.core.et.EtSessionManager
@@ -287,6 +288,45 @@ class ConnectionsViewModel @Inject constructor(
         viewModelScope.launch {
             larktunTailnetManager.refresh()
         }
+    }
+
+    fun pingLarktunPeer(peer: LarktunTailnetPeer) {
+        val address = peer.primaryTailscaleIP
+        if (address == null) {
+            _error.value = "No Tailscale IP available for ${peer.bestName}"
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val result = larktunTailnetManager.ping(address)
+                val message = result.toDisplayMessage(peer.bestName)
+                if (result.error.isNullOrBlank()) {
+                    _warning.value = message
+                } else {
+                    _error.value = message
+                }
+            } catch (e: Exception) {
+                _error.value = "Ping failed: ${e.message ?: "unknown error"}"
+            }
+        }
+    }
+
+    fun larktunSshProfile(peer: LarktunTailnetPeer): ConnectionProfile? {
+        val host = peer.bestAddress ?: return null
+        return ConnectionProfile(
+            id = "larktun-${java.util.UUID.randomUUID()}",
+            label = peer.bestName,
+            host = host,
+            port = 22,
+            username = "",
+            tunnelConfigId = LarktunTailnetManager.SHARED_TUNNEL_CONFIG_ID,
+        )
+    }
+
+    suspend fun openLarktunPeerWeb(peer: LarktunTailnetPeer): String {
+        val host = peer.bestAddress
+            ?: throw IllegalArgumentException("No address available for ${peer.bestName}")
+        return larktunTailnetManager.startWebProxy(host = host, port = 80)
     }
 
     val sessions: StateFlow<Map<String, SshSessionManager.SessionState>> = sshSessionManager.sessions
@@ -1560,7 +1600,7 @@ class ConnectionsViewModel @Inject constructor(
                         agentIdentities = agentIdentitiesFor(profile),
                     )
 
-                    // Proxy precedence: jump host > WireGuard tunnel (#102) > SOCKS/HTTP.
+                    // Proxy precedence: jump host > app-only tunnel (#102/Larktun) > SOCKS/HTTP.
                     // The three are mutually exclusive at connect time — if a
                     // profile somehow has both a jump host and a tunnel configured,
                     // the jump host wins (it's the more explicit hop) and the
@@ -1569,11 +1609,7 @@ class ConnectionsViewModel @Inject constructor(
                     val proxy = when {
                         jumpSessionId != null -> sshSessionManager.createProxyJump(jumpSessionId)
                             ?: throw Exception("Jump host session not usable for tunneling")
-                        tunnelId != null -> {
-                            val tunnel = tunnelManager.getTunnel(tunnelId)
-                                ?: throw Exception("Tunnel config $tunnelId not found")
-                            sh.haven.core.tunnel.TunnelProxy(tunnel)
-                        }
+                        tunnelId != null -> resolveTunnelProxy(tunnelId)
                         else -> createNetworkProxy(profile)
                     }
                     Log.d(TAG, "Connecting to ${config.host}:${config.port} (proxy=${proxy != null})")
@@ -2326,6 +2362,17 @@ class ConnectionsViewModel @Inject constructor(
             "HTTP" -> com.jcraft.jsch.ProxyHTTP(proxyHost, profile.proxyPort)
             else -> null
         }
+    }
+
+    private suspend fun resolveTunnelProxy(tunnelId: String): Proxy {
+        val tunnel = if (tunnelId == LarktunTailnetManager.SHARED_TUNNEL_CONFIG_ID) {
+            larktunTailnetManager.getRunningTunnel()
+                ?: throw Exception("Larktun network is not running")
+        } else {
+            tunnelManager.getTunnel(tunnelId)
+                ?: throw Exception("Tunnel config $tunnelId not found")
+        }
+        return sh.haven.core.tunnel.TunnelProxy(tunnel)
     }
 
     /**
@@ -3137,9 +3184,7 @@ class ConnectionsViewModel @Inject constructor(
         }
         val tunnelId = profile.tunnelConfigId
         if (tunnelId != null) {
-            val tunnel = tunnelManager.getTunnel(tunnelId)
-                ?: throw Exception("Tunnel config $tunnelId not found")
-            return sh.haven.core.tunnel.TunnelProxy(tunnel)
+            return resolveTunnelProxy(tunnelId)
         }
         return createNetworkProxy(profile)
     }

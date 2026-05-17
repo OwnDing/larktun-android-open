@@ -1,5 +1,6 @@
 package sh.haven.core.tunnel
 
+import kotlin.math.roundToInt
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -92,6 +93,62 @@ data class LarktunTailnetPeer(
 
     val bestAddress: String?
         get() = firstNonBlank(dnsName, tailscaleIPs.firstOrNull())
+
+    val primaryTailscaleIP: String?
+        get() = tailscaleIPs.firstOrNull()
+}
+
+data class LarktunPingResult(
+    val ip: String? = null,
+    val nodeIP: String? = null,
+    val nodeName: String? = null,
+    val error: String? = null,
+    val latencySeconds: Double? = null,
+    val endpoint: String? = null,
+    val peerRelay: String? = null,
+    val derpRegionID: Int = 0,
+    val derpRegionCode: String? = null,
+    val peerAPIPort: Int = 0,
+    val peerAPIURL: String? = null,
+    val isLocalIP: Boolean = false,
+) {
+    fun toDisplayMessage(fallbackName: String): String {
+        val target = firstNonBlank(nodeName, nodeIP, ip, fallbackName) ?: fallbackName
+        if (!error.isNullOrBlank()) {
+            return "Ping $target failed: $error"
+        }
+
+        val latency = latencySeconds?.let {
+            "${(it * 1_000.0).roundToInt()} ms"
+        } ?: "ok"
+        val via = when {
+            !peerRelay.isNullOrBlank() -> "peer-relay"
+            derpRegionID != 0 -> firstNonBlank(derpRegionCode, "DERP") ?: "DERP"
+            !endpoint.isNullOrBlank() -> endpoint
+            else -> "TSMP"
+        }
+        return "Ping $target: $latency via $via"
+    }
+
+    companion object {
+        fun fromJson(json: String): LarktunPingResult {
+            val obj = JSONObject(json)
+            return LarktunPingResult(
+                ip = obj.optStringOrNull("ip"),
+                nodeIP = obj.optStringOrNull("nodeIP"),
+                nodeName = obj.optStringOrNull("nodeName"),
+                error = obj.optStringOrNull("error"),
+                latencySeconds = obj.optDoubleOrNull("latencySeconds"),
+                endpoint = obj.optStringOrNull("endpoint"),
+                peerRelay = obj.optStringOrNull("peerRelay"),
+                derpRegionID = obj.optInt("derpRegionID", 0),
+                derpRegionCode = obj.optStringOrNull("derpRegionCode"),
+                peerAPIPort = obj.optInt("peerAPIPort", 0),
+                peerAPIURL = obj.optStringOrNull("peerAPIURL"),
+                isLocalIP = obj.optBoolean("isLocalIP", false),
+            )
+        }
+    }
 }
 
 private fun JSONArray?.toStringList(): List<String> {
@@ -145,6 +202,13 @@ private fun JSONArray?.toPeerList(): List<LarktunTailnetPeer> {
 private fun JSONObject.optStringOrNull(name: String): String? {
     if (!has(name) || isNull(name)) return null
     return optString(name).trim().takeIf { it.isNotEmpty() }
+}
+
+private fun JSONObject.optDoubleOrNull(name: String): Double? {
+    if (!has(name) || isNull(name)) return null
+    return runCatching { optDouble(name) }
+        .getOrNull()
+        ?.takeIf { !it.isNaN() && !it.isInfinite() }
 }
 
 private fun firstNonBlank(vararg values: String?): String? =

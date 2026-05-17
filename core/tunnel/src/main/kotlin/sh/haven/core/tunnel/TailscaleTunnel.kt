@@ -56,6 +56,9 @@ class TailscaleTunnel internal constructor(
     }
 
     fun statusJson(): String = native.statusJSON()
+
+    fun pingJson(address: String, timeoutMs: Int = 3_000): String =
+        native.pingJSON(address, timeoutMs.toLong())
 }
 
 /**
