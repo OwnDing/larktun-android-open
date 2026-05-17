@@ -125,6 +125,7 @@
     <string name="settings_about_dialog_title">关于 Larktun</string>
     <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Android 开源 SSH、VNC、RDP 和云存储客户端</string>
+    <string name="settings_about_based_on_haven">Larktun Android 基于开源 Haven App 开发，保留其终端、连接、文件、桌面和本地 Linux 基础能力，并加入 Larktun 设备互联功能。</string>
     <string name="settings_about_version">版本 %1$s（构建 %2$d）</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>
     <string name="settings_about_libraries_title">开源库</string>

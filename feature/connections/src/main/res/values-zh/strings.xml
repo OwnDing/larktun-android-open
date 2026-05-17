@@ -75,6 +75,8 @@
     <string name="connections_larktun_web_back">后退</string>
     <string name="connections_larktun_web_forward">前进</string>
     <string name="connections_larktun_web_reload">刷新</string>
+    <string name="connections_larktun_web_address">地址</string>
+    <string name="connections_larktun_web_go">前往</string>
     <string name="connections_larktun_web_proxy_unsupported">当前 Android WebView 不支持应用内代理浏览。请更新 Android System WebView 或 Chrome 后重试。</string>
     <string name="connections_larktun_ping_title">正在 Ping %1$s</string>
     <string name="connections_larktun_ping_samples">%1$d / %2$d 次</string>

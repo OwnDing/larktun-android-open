@@ -244,12 +244,13 @@ class ConnectionsViewModel @Inject constructor(
         viewModelScope.launch {
             _larktunAuthBusy.value = true
             try {
-                larktunAccountRepository.login(
+                val session = larktunAccountRepository.login(
                     username = username.trim(),
                     password = password,
                     captchaCode = captchaCode.trim(),
                     captchaId = captcha.captchaId,
                 )
+                larktunTailnetManager.applySession(session)
                 _larktunCaptcha.value = null
                 _larktunAuthError.value = null
             } catch (e: Exception) {
@@ -273,10 +274,11 @@ class ConnectionsViewModel @Inject constructor(
         viewModelScope.launch {
             _larktunAuthBusy.value = true
             try {
-                larktunAccountRepository.saveManualSession(
+                val session = larktunAccountRepository.saveManualSession(
                     authKey = authKey.trim(),
                     serverUrl = controlUrl.trim(),
                 )
+                larktunTailnetManager.applySession(session)
                 _larktunCaptcha.value = null
                 _larktunAuthError.value = null
             } catch (e: Exception) {
@@ -292,6 +294,7 @@ class ConnectionsViewModel @Inject constructor(
             _larktunAuthBusy.value = true
             try {
                 larktunAccountRepository.signOut()
+                larktunTailnetManager.applySession(null)
                 _larktunCaptcha.value = null
                 _larktunAuthError.value = null
             } catch (e: Exception) {

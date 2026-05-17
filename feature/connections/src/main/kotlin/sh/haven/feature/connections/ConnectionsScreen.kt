@@ -182,6 +182,8 @@ fun ConnectionsScreen(
     val larktunAuthError by viewModel.larktunAuthError.collectAsState()
     val larktunTailnetStatus by viewModel.larktunTailnetStatus.collectAsState()
     val larktunSshCredentials by viewModel.larktunSshCredentials.collectAsState()
+    val showLarktunDevices =
+        larktunSession != null || larktunTailnetStatus.phase != LarktunTailnetStatus.Phase.IDLE
     val groups by viewModel.groups.collectAsState()
     val sshKeys by viewModel.sshKeys.collectAsState()
     val tunnelConfigs by viewModel.tunnelConfigs.collectAsState()
@@ -358,6 +360,12 @@ fun ConnectionsScreen(
         if (deploySuccess) {
             snackbarHostState.showSnackbar(keyDeployedMessage)
             viewModel.dismissDeploySuccess()
+        }
+    }
+
+    LaunchedEffect(larktunSession?.authKey) {
+        if (larktunSession != null) {
+            showLarktunAccount = false
         }
     }
 
@@ -1103,7 +1111,7 @@ fun ConnectionsScreen(
             }
 
             // Linux VM card — shown when Terminal app is installed and not hidden in settings
-            if (connections.isEmpty()) {
+            if (connections.isEmpty() && !showLarktunDevices) {
                 EmptyState()
             } else {
                 // Build tree: top-level profiles first, then dependents nested beneath.
@@ -1224,7 +1232,7 @@ fun ConnectionsScreen(
 
                 LazyColumn(state = lazyListState, modifier = Modifier.fillMaxSize()) {
                     item(key = "workspace-section") { workspaceSection() }
-                    if (larktunSession != null) {
+                    if (showLarktunDevices) {
                         item(key = "larktun-tailnet-devices") {
                             LarktunTailnetDevicesSection(
                                 status = larktunTailnetStatus,

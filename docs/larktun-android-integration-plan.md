@@ -117,7 +117,7 @@ Current action scope:
 - Menu entries should include:
   - `Ping`: open a Larktun ping sheet, run 10 app-only tsnet ping samples against the peer's primary Tailscale IP, and render the samples as a latency chart with the latest route mode (`Direct`, `DERP`, `Peer relay`, `TSMP`, or `Not connected`).
   - `SSH`: open a Larktun-specific SSH dialog, matching the iOS flow with `Password` and `SSH key` auth modes. Password mode supports saved Larktun device credentials and a remember-password checkbox. Key mode uses the existing Android `Keys` repository and asks for a passphrase when the selected key is encrypted.
-  - `Open Web`: open an in-app Android `WebView` instead of launching Chrome or another external browser. The WebView is configured with a loopback-only HTTP/CONNECT forward proxy, and that proxy dials HTTP/HTTPS targets through the shared Larktun tsnet runtime. Default the selected peer to `http://<peer>:80/` for the first pass, while allowing normal page links and HTTPS `CONNECT` requests to continue through the same app-only proxy.
+  - `Open Web`: open an in-app Android `WebView` instead of launching Chrome or another external browser. The WebView is configured with a loopback-only HTTP/CONNECT forward proxy, and that proxy dials HTTP/HTTPS targets through the shared Larktun tsnet runtime. Default the selected peer to `http://<peer>:80/`, but provide an editable address bar so the user can enter any `http://` or `https://` peer URL and port, such as `http://nas:8080/` or `https://router:8443/`.
   - `Copy Address`: copy MagicDNS name or primary Tailscale IP.
 - Larktun peer actions must not mutate or delete the live peer list.
 - Larktun peer actions should not create manual `ConnectionProfile` rows unless the user explicitly chooses a future `Save as connection` action.
@@ -207,6 +207,7 @@ Sign out should:
 - Render `Larktun Devices` above manual connections.
 - Add refresh and polling behavior.
 - Add empty, loading, and error states.
+- Ensure the Larktun device section renders immediately after login even when there are no saved manual `ConnectionProfile` rows yet.
 
 ### Phase 6: Device Connection Actions
 
@@ -214,7 +215,7 @@ Sign out should:
 - Implement Ping through the Go `tsbridge` runtime and surface 10 samples in a bottom-sheet latency chart.
 - Implement SSH with a Larktun-specific password/key dialog and a special shared Larktun tunnel route, so the peer connection reuses the logged-in app-only tsnet runtime.
 - Store remembered Larktun SSH passwords in encrypted account-scoped preferences, separate from manual `ConnectionProfile` passwords.
-- Implement Open Web with an in-app WebView plus loopback HTTP/CONNECT forward proxy backed by the shared Larktun tunnel. The proxy should be replaced when another peer is opened and cleaned up automatically after a short idle window. External browsers must not be used for Larktun device browsing because they cannot be configured to use the app-only tsnet runtime.
+- Implement Open Web with an in-app WebView plus loopback HTTP/CONNECT forward proxy backed by the shared Larktun tunnel. The browser must include an editable address bar for non-default service ports. The proxy should be replaced when another peer is opened and cleaned up automatically after a short idle window. External browsers must not be used for Larktun device browsing because they cannot be configured to use the app-only tsnet runtime.
 - Add `Save as connection` after the temporary connection path is stable.
 
 ## Verification

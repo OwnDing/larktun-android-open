@@ -42,7 +42,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.VpnLock
@@ -825,14 +824,6 @@ fun SettingsScreen(
             subtitle = "v${packageInfo.versionName}",
             onClick = { showAboutDialog = true },
         )
-        SettingsItem(
-            icon = Icons.Filled.Favorite,
-            title = stringResource(R.string.settings_support_title),
-            subtitle = stringResource(R.string.settings_support_subtitle),
-            onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
-            },
-        )
 
     } // scrollable Column
     } // outer Column
@@ -849,9 +840,6 @@ fun SettingsScreen(
             onDismiss = { showAboutDialog = false },
             onOpenGitHub = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-            },
-            onOpenKofi = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
             },
         )
     }
@@ -1333,7 +1321,6 @@ private fun BackupPasswordDialog(
 }
 
 private const val GITHUB_URL = "https://github.com/OwnDing/larktun-android-open"
-private const val KOFI_URL = "https://ko-fi.com/glassontin"
 
 @Composable
 private fun AboutDialog(
@@ -1341,7 +1328,6 @@ private fun AboutDialog(
     versionCode: Long,
     onDismiss: () -> Unit,
     onOpenGitHub: () -> Unit,
-    onOpenKofi: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1355,6 +1341,12 @@ private fun AboutDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.settings_about_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_about_based_on_haven),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1374,6 +1366,7 @@ private fun AboutDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 val libraries = listOf(
+                    "Haven" to "Upstream Android terminal, connection, file, VNC/RDP and local Linux foundation — open source",
                     "rclone" to "Cloud storage engine (60+ providers) — MIT",
                     "IronRDP" to "RDP protocol (Rust/UniFFI) — MIT/Apache-2.0",
                     "JSch" to "SSH/SFTP protocol — BSD",
@@ -1399,9 +1392,6 @@ private fun AboutDialog(
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onOpenKofi) {
-                    Text(stringResource(R.string.common_support))
-                }
                 TextButton(onClick = onOpenGitHub) {
                     Text(stringResource(R.string.common_github))
                 }

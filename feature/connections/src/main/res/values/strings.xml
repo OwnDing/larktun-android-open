@@ -75,6 +75,8 @@
     <string name="connections_larktun_web_back">Back</string>
     <string name="connections_larktun_web_forward">Forward</string>
     <string name="connections_larktun_web_reload">Reload</string>
+    <string name="connections_larktun_web_address">Address</string>
+    <string name="connections_larktun_web_go">Go</string>
     <string name="connections_larktun_web_proxy_unsupported">This Android WebView does not support app-only proxy browsing. Update Android System WebView or Chrome, then try again.</string>
     <string name="connections_larktun_ping_title">Pinging %1$s</string>
     <string name="connections_larktun_ping_samples">%1$d / %2$d samples</string>

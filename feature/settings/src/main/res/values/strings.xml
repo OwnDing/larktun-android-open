@@ -137,6 +137,7 @@
     <string name="settings_about_dialog_title">About Larktun</string>
     <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Open source SSH, VNC, RDP &amp; cloud storage client for Android</string>
+    <string name="settings_about_based_on_haven">Larktun for Android is based on the open-source Haven app, keeping its terminal, connection, file, desktop, and local Linux foundations while adding Larktun device connectivity.</string>
     <string name="settings_about_version">Version %1$s (build %2$d)</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>
     <string name="settings_about_libraries_title">Open Source Libraries</string>

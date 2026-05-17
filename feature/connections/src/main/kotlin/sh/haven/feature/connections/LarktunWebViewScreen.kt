@@ -9,12 +9,16 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -25,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,8 +41,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -66,8 +73,21 @@ fun LarktunWebViewScreen(
     var loading by remember { mutableStateOf(false) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
+    var addressText by remember(page.initialUrl) { mutableStateOf(page.initialUrl) }
+    var requestedUrl by remember(page.initialUrl) { mutableStateOf(page.initialUrl) }
+    var addressFocused by remember { mutableStateOf(false) }
     var proxyReady by remember(page.proxyUrl) { mutableStateOf(false) }
     var proxyUnsupported by remember(page.proxyUrl) { mutableStateOf(false) }
+
+    fun navigateToAddress(rawAddress: String) {
+        val nextUrl = normalizeLarktunWebUrl(rawAddress, currentUrl)
+        addressText = nextUrl
+        requestedUrl = nextUrl
+        webView?.let { view ->
+            view.tag = nextUrl
+            view.loadUrl(nextUrl)
+        }
+    }
 
     DisposableEffect(page.proxyUrl) {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
@@ -106,55 +126,88 @@ fun LarktunWebViewScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = title.ifBlank { page.title },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = currentUrl,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_close))
-                    }
-                },
-                actions = {
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = title.ifBlank { page.title },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = currentUrl,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_close))
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            enabled = canGoBack,
+                            onClick = { webView?.goBack() },
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.connections_larktun_web_back),
+                            )
+                        }
+                        IconButton(
+                            enabled = canGoForward,
+                            onClick = { webView?.goForward() },
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = stringResource(R.string.connections_larktun_web_forward),
+                            )
+                        }
+                        IconButton(onClick = { webView?.reload() }) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = stringResource(R.string.connections_larktun_web_reload),
+                            )
+                        }
+                    },
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = addressText,
+                        onValueChange = { addressText = it },
+                        label = { Text(stringResource(R.string.connections_larktun_web_address)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(
+                            onGo = { navigateToAddress(addressText) },
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focusState ->
+                                addressFocused = focusState.isFocused
+                            },
+                    )
                     IconButton(
-                        enabled = canGoBack,
-                        onClick = { webView?.goBack() },
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.connections_larktun_web_back),
-                        )
-                    }
-                    IconButton(
-                        enabled = canGoForward,
-                        onClick = { webView?.goForward() },
+                        onClick = { navigateToAddress(addressText) },
+                        modifier = Modifier.padding(top = 8.dp),
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = stringResource(R.string.connections_larktun_web_forward),
+                            contentDescription = stringResource(R.string.connections_larktun_web_go),
                         )
                     }
-                    IconButton(onClick = { webView?.reload() }) {
-                        Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = stringResource(R.string.connections_larktun_web_reload),
-                        )
-                    }
-                },
-            )
+                }
+            }
         },
     ) { innerPadding ->
         Column(
@@ -189,11 +242,14 @@ fun LarktunWebViewScreen(
 
             if (proxyReady && !proxyUnsupported) {
                 LarktunAndroidWebView(
-                    initialUrl = page.initialUrl,
+                    targetUrl = requestedUrl,
                     onWebView = { view -> webView = view },
                     onStateChanged = { state ->
                         title = state.title ?: page.title
                         currentUrl = state.url ?: page.initialUrl
+                        if (!addressFocused) {
+                            addressText = state.url ?: page.initialUrl
+                        }
                         progress = state.progress
                         loading = state.loading
                         canGoBack = state.canGoBack
@@ -209,7 +265,7 @@ fun LarktunWebViewScreen(
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun LarktunAndroidWebView(
-    initialUrl: String,
+    targetUrl: String,
     onWebView: (WebView) -> Unit,
     onStateChanged: (LarktunWebViewState) -> Unit,
     modifier: Modifier = Modifier,
@@ -262,16 +318,32 @@ private fun LarktunAndroidWebView(
                 }
 
                 onWebView(this)
-                loadUrl(initialUrl)
+                tag = targetUrl
+                loadUrl(targetUrl)
             }
         },
         update = { view ->
             onWebView(view)
-            if (view.url == null && Uri.parse(initialUrl).scheme != null) {
-                view.loadUrl(initialUrl)
+            if (view.tag != targetUrl && Uri.parse(targetUrl).scheme != null) {
+                view.tag = targetUrl
+                view.loadUrl(targetUrl)
             }
         },
     )
+}
+
+private fun normalizeLarktunWebUrl(rawAddress: String, fallbackUrl: String): String {
+    val trimmed = rawAddress.trim()
+    if (trimmed.isBlank()) return fallbackUrl
+    if (trimmed.startsWith("//")) return "http:$trimmed"
+    val hasScheme = Regex("^[A-Za-z][A-Za-z0-9+.-]*://").containsMatchIn(trimmed)
+    val candidate = if (hasScheme) trimmed else "http://$trimmed"
+    val parsed = Uri.parse(candidate)
+    return if (parsed.scheme == "http" || parsed.scheme == "https") {
+        candidate
+    } else {
+        "http://$trimmed"
+    }
 }
 
 private data class LarktunWebViewState(
