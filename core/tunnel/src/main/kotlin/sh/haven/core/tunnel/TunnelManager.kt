@@ -85,6 +85,7 @@ class DefaultTunnelFactory @Inject constructor(
                 stateDir = File(context.filesDir, "tailscale-${config.id}").also { it.mkdirs() },
                 hostname = deriveHostname(config.label),
                 controlURL = parsed.controlURL,
+                defaultRouteInterface = AndroidDefaultRouteInterface.current(context),
             )
         }
     }

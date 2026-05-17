@@ -3,6 +3,7 @@ package sh.haven.core.tunnel
 import sh.haven.rclone.binding.tsbridge.Conn as NativeConn
 import sh.haven.rclone.binding.tsbridge.Tsbridge
 import sh.haven.rclone.binding.tsbridge.TunnelHandle as NativeHandle
+import android.util.Log
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -30,12 +31,21 @@ class TailscaleTunnel internal constructor(
     stateDir: File,
     hostname: String,
     controlURL: String = "",
+    defaultRouteInterface: String = "",
 ) : Tunnel {
 
     private val native: NativeHandle = try {
+        if (defaultRouteInterface.isNotBlank()) {
+            try {
+                Tsbridge.setDefaultRouteInterface(defaultRouteInterface)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Unable to update Tailscale default route interface", t)
+            }
+        }
         Tsbridge.startTunnel(authKey, stateDir.absolutePath, hostname, controlURL)
-    } catch (e: Exception) {
-        throw IOException("Failed to start Tailscale tunnel: ${e.message}", e)
+    } catch (t: Throwable) {
+        Log.e(TAG, "Failed to start Tailscale tunnel", t)
+        throw IOException("Failed to start Tailscale tunnel: ${t.message}", t)
     }
 
     override fun dial(host: String, port: Int, timeoutMs: Int): TunneledConnection {
@@ -60,6 +70,8 @@ class TailscaleTunnel internal constructor(
     fun pingJson(address: String, timeoutMs: Int = 3_000): String =
         native.pingJSON(address, timeoutMs.toLong())
 }
+
+private const val TAG = "TailscaleTunnel"
 
 /**
  * Wraps a native [NativeConn] as [TunneledConnection]. Mirrors the

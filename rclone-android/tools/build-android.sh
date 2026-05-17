@@ -64,6 +64,7 @@ gomobile bind \
     -target=android/arm64,android/amd64 \
     -javapkg=sh.haven.rclone.binding \
     -androidapi=26 \
+    -tags=ts_omit_portmapper \
     -o "$AAR_DIR/rcbridge.aar" \
     . ./wgbridge ./tsbridge
 

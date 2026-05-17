@@ -42,6 +42,7 @@ import (
 	"unsafe"
 
 	"tailscale.com/client/local"
+	"tailscale.com/envknob"
 	"tailscale.com/ipn"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/net/netmon"
@@ -67,12 +68,31 @@ const nodeAliasCapability = "sh.larktun.alias"
 // touching netlink or `/proc/net`, both of which Android's SELinux
 // policy blocks.
 func init() {
+	// Android app sandboxes can kill the process with SIGSYS when
+	// Tailscale's portmapper probes /proc/net/route while looking for
+	// UPnP/NAT-PMP/PCP gateways. Larktun uses tsnet as an app-local
+	// userspace client, so port mapping is unnecessary here.
+	envknob.Setenv("TS_DISABLE_PORTMAPPER", "1")
 	netmon.RegisterInterfaceGetter(androidSafeInterfaces)
 }
 
-func androidSafeInterfaces() ([]netmon.Interface, error) {
-	// Try Go stdlib first — works on desktop Linux and older Androids
-	// where netlink was still allowed. Falls through on EACCES.
+// SetDefaultRouteInterface lets the Android/Kotlin layer pass the active
+// ConnectivityManager interface name into Tailscale's Android netmon hook.
+// This avoids default-route discovery paths that are unsafe in app sandboxes.
+func SetDefaultRouteInterface(ifName string) {
+	netmon.UpdateLastKnownDefaultRouteInterface(strings.TrimSpace(ifName))
+}
+
+func androidSafeInterfaces() (out []netmon.Interface, err error) {
+	defer recoverToError("android interface enumeration", &err)
+
+	// Prefer getifaddrs on Android. It avoids Go stdlib's netlink path,
+	// which is blocked on Android 10+ on many real devices even when it
+	// happens to work on emulators.
+	if ifs, err := getifaddrsInterfaces(); err == nil && len(ifs) > 0 {
+		return ifs, nil
+	}
+
 	if ifs, err := net.Interfaces(); err == nil && len(ifs) > 0 {
 		out := make([]netmon.Interface, len(ifs))
 		for i := range ifs {
@@ -116,6 +136,7 @@ func getifaddrsInterfaces() ([]netmon.Interface, error) {
 		if info == nil {
 			info = &ifaceInfo{
 				name:  name,
+				index: int(C.if_nametoindex(ifa.ifa_name)),
 				flags: translateFlags(uint32(ifa.ifa_flags)),
 			}
 			byName[name] = info
@@ -327,7 +348,18 @@ type pingPayload struct {
 // tsnet's internal logs route through Go's default logger which
 // gomobile surfaces under logcat's "GoLog" tag, so a stuck handshake
 // or DERP failure is diagnosable without a separate debug build.
-func StartTunnel(authKey, stateDir, hostname, controlURL string) (*TunnelHandle, error) {
+func StartTunnel(authKey, stateDir, hostname, controlURL string) (handle *TunnelHandle, err error) {
+	var srv *tsnet.Server
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if srv != nil {
+				_ = srv.Close()
+			}
+			err = fmt.Errorf("tsbridge StartTunnel panic: %v", recovered)
+			handle = nil
+		}
+	}()
+
 	if authKey == "" {
 		return nil, errors.New("authkey required")
 	}
@@ -337,7 +369,7 @@ func StartTunnel(authKey, stateDir, hostname, controlURL string) (*TunnelHandle,
 	if hostname == "" {
 		hostname = "haven-android"
 	}
-	srv := &tsnet.Server{
+	srv = &tsnet.Server{
 		AuthKey:    authKey,
 		Dir:        stateDir,
 		Hostname:   hostname,
@@ -398,7 +430,9 @@ func waitForPeerMap(ctx context.Context, srv *tsnet.Server) error {
 // MagicDNS name (foo.tailnet.ts.net), a tailnet IP (100.x.y.z), or
 // any IP that the tailnet can reach (e.g. a subnet-router hop).
 // timeoutMs <= 0 means 30 s.
-func (t *TunnelHandle) Dial(host string, port int, timeoutMs int) (*Conn, error) {
+func (t *TunnelHandle) Dial(host string, port int, timeoutMs int) (conn *Conn, err error) {
+	defer recoverToError("tsbridge Dial", &err)
+
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -425,7 +459,13 @@ func (t *TunnelHandle) Dial(host string, port int, timeoutMs int) (*Conn, error)
 // StatusJSON returns a compact tailnet status snapshot for Android UI code.
 // It intentionally mirrors the iOS AppEngine payload shape so both clients
 // can render Larktun device rows from the same fields.
-func (t *TunnelHandle) StatusJSON() string {
+func (t *TunnelHandle) StatusJSON() (result string) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = fmt.Sprintf(`{"status":"failed","lastError":%q}`, fmt.Sprintf("tsbridge StatusJSON panic: %v", recovered))
+		}
+	}()
+
 	payload := t.statusPayload()
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -436,7 +476,9 @@ func (t *TunnelHandle) StatusJSON() string {
 
 // PingJSON runs a TSMP ping through the app-only tsnet runtime and returns
 // a compact JSON payload for the Android Larktun device menu.
-func (t *TunnelHandle) PingJSON(ip string, timeoutMs int) (string, error) {
+func (t *TunnelHandle) PingJSON(ip string, timeoutMs int) (result string, err error) {
+	defer recoverToError("tsbridge PingJSON", &err)
+
 	t.mu.Lock()
 	if t.closed {
 		t.mu.Unlock()
@@ -466,12 +508,12 @@ func (t *TunnelHandle) PingJSON(ip string, timeoutMs int) (string, error) {
 		time.Duration(timeoutMs)*time.Millisecond,
 	)
 	defer cancel()
-	result, err := lc.Ping(ctx, addr, tailcfg.PingTSMP)
+	pingResult, err := lc.Ping(ctx, addr, tailcfg.PingTSMP)
 	if err != nil {
 		return "", err
 	}
 
-	data, err := json.Marshal(pingPayloadFromResult(result))
+	data, err := json.Marshal(pingPayloadFromResult(pingResult))
 	if err != nil {
 		return "", err
 	}
@@ -544,6 +586,12 @@ func pingPayloadFromResult(result *ipnstate.PingResult) pingPayload {
 // Close tears down the tailnet connection. The state directory is kept
 // intact so a subsequent StartTunnel picks up without re-auth.
 func (t *TunnelHandle) Close() {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			tsnetLogf("tsbridge Close panic: %v", recovered)
+		}
+	}()
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
@@ -553,6 +601,12 @@ func (t *TunnelHandle) Close() {
 	if t.srv != nil {
 		_ = t.srv.Close()
 		t.srv = nil
+	}
+}
+
+func recoverToError(context string, target *error) {
+	if recovered := recover(); recovered != nil && target != nil {
+		*target = fmt.Errorf("%s panic: %v", context, recovered)
 	}
 }
 

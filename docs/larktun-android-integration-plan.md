@@ -87,6 +87,12 @@ Extend the existing `tsbridge` Go bridge and Kotlin tunnel wrapper into an accou
 
 This runtime is app-only. It does not create or request Android `VpnService`.
 
+Android compatibility notes:
+
+- Build the gomobile bridge with `ts_omit_portmapper` and also set `TS_DISABLE_PORTMAPPER=1` during `tsbridge` initialization. Larktun does not need UPnP/NAT-PMP/PCP mappings, and Tailscale's Android portmapper gateway probe can read `/proc/net/route`, which can crash some Android 10/Huawei devices with `SIGSYS`/`SYS_SECCOMP` before Go can return an error.
+- Register the existing libc `getifaddrs(3)` interface getter so tsnet does not use Go's netlink-based interface enumeration in the Android app sandbox.
+- Before starting tsnet, pass `ConnectivityManager`'s active `LinkProperties.interfaceName` into `netmon.UpdateLastKnownDefaultRouteInterface`. This gives Tailscale's Android netmon a safe default-route hint without reading `/proc/net/route`.
+
 ## Connect Screen UX
 
 Add a `My` icon to the Connect screen top bar.

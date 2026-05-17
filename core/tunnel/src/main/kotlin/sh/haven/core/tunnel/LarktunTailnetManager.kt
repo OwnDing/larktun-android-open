@@ -3,6 +3,7 @@ package sh.haven.core.tunnel
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.security.MessageDigest
@@ -30,6 +31,7 @@ class LarktunTailnetManager @Inject constructor(
 ) {
     companion object {
         const val SHARED_TUNNEL_CONFIG_ID = "__larktun_account_tailnet__"
+        private const val TAG = "LarktunTailnetManager"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -120,6 +122,7 @@ class LarktunTailnetManager @Inject constructor(
                     stateDir = stateDir,
                     hostname = buildHostname(),
                     controlURL = session.serverUrl,
+                    defaultRouteInterface = AndroidDefaultRouteInterface.current(context),
                 )
             }
             currentSessionKey = nextSessionKey
@@ -130,10 +133,11 @@ class LarktunTailnetManager @Inject constructor(
                     refreshStatus()
                 }
             }
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to start Larktun network", t)
             stopLocked()
             _status.value = LarktunTailnetStatus.error(
-                e.message ?: "Failed to start Larktun network",
+                t.message ?: "Failed to start Larktun network",
             )
         }
     }
