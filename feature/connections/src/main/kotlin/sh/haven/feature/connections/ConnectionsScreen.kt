@@ -190,6 +190,7 @@ fun ConnectionsScreen(
     var showLarktunAccount by rememberSaveable { mutableStateOf(false) }
     var larktunPingPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
     var larktunSshPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
+    var larktunWebPage by remember { mutableStateOf<LarktunWebPage?>(null) }
     val profileStatuses by viewModel.profileStatuses.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
 
@@ -936,6 +937,14 @@ fun ConnectionsScreen(
         )
     }
 
+    larktunWebPage?.let { page ->
+        LarktunWebViewScreen(
+            page = page,
+            onClose = { larktunWebPage = null },
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1231,8 +1240,12 @@ fun ConnectionsScreen(
                                 onOpenWeb = { peer ->
                                     scope.launch {
                                         try {
-                                            val url = viewModel.openLarktunPeerWeb(peer)
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                            val session = viewModel.openLarktunPeerWeb(peer)
+                                            larktunWebPage = LarktunWebPage(
+                                                title = peer.bestName,
+                                                initialUrl = session.initialUrl,
+                                                proxyUrl = session.proxyUrl,
+                                            )
                                         } catch (e: Exception) {
                                             viewModel.showError(
                                                 e.message ?: context.getString(R.string.connections_larktun_web_open_failed),

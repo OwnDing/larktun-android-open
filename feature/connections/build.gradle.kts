@@ -49,6 +49,8 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.lifecycle.viewmodel)
+    implementation(libs.activity.compose)
+    implementation(libs.androidx.webkit)
 
     testImplementation(project(":core:rdp"))
     testImplementation(libs.junit)

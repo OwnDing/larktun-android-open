@@ -65,16 +65,14 @@ class LarktunTailnetManager @Inject constructor(
         }
     }
 
-    suspend fun startWebProxy(host: String, port: Int = 80): String {
+    suspend fun startWebProxy(host: String, port: Int = 80): LarktunWebProxySession {
         val snapshot = mutex.withLock { tunnel }
             ?: throw IllegalStateException("Larktun network is not running")
         val proxy = LarktunHttpProxy(
             tunnel = snapshot,
-            remoteHost = host,
-            remotePort = port,
             scope = scope,
         )
-        val url = withContext(Dispatchers.IO) {
+        val proxyUrl = withContext(Dispatchers.IO) {
             proxy.start()
         }
         mutex.withLock {
@@ -90,7 +88,16 @@ class LarktunTailnetManager @Inject constructor(
                 }
             }
         }
-        return url
+        return LarktunWebProxySession(
+            proxyUrl = proxyUrl,
+            initialUrl = initialWebUrl(host = host, port = port),
+        )
+    }
+
+    private fun initialWebUrl(host: String, port: Int): String {
+        val urlHost = if (host.contains(':') && !host.startsWith("[")) "[$host]" else host
+        val portPart = if (port == 80) "" else ":$port"
+        return "http://$urlHost$portPart/"
     }
 
     private suspend fun start(session: LarktunSession) = mutex.withLock {

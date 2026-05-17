@@ -117,7 +117,7 @@ Current action scope:
 - Menu entries should include:
   - `Ping`: open a Larktun ping sheet, run 10 app-only tsnet ping samples against the peer's primary Tailscale IP, and render the samples as a latency chart with the latest route mode (`Direct`, `DERP`, `Peer relay`, `TSMP`, or `Not connected`).
   - `SSH`: open a Larktun-specific SSH dialog, matching the iOS flow with `Password` and `SSH key` auth modes. Password mode supports saved Larktun device credentials and a remember-password checkbox. Key mode uses the existing Android `Keys` repository and asks for a passphrase when the selected key is encrypted.
-  - `Open Web`: open the peer's HTTP service through a short-lived loopback reverse proxy so the Android browser talks to `127.0.0.1`, while the app forwards bytes to the peer through tsnet. Default to port `80` for the first pass. This keeps web browsing app-only and does not require system VPN.
+  - `Open Web`: open an in-app Android `WebView` instead of launching Chrome or another external browser. The WebView is configured with a loopback-only HTTP/CONNECT forward proxy, and that proxy dials HTTP/HTTPS targets through the shared Larktun tsnet runtime. Default the selected peer to `http://<peer>:80/` for the first pass, while allowing normal page links and HTTPS `CONNECT` requests to continue through the same app-only proxy.
   - `Copy Address`: copy MagicDNS name or primary Tailscale IP.
 - Larktun peer actions must not mutate or delete the live peer list.
 - Larktun peer actions should not create manual `ConnectionProfile` rows unless the user explicitly chooses a future `Save as connection` action.
@@ -214,7 +214,7 @@ Sign out should:
 - Implement Ping through the Go `tsbridge` runtime and surface 10 samples in a bottom-sheet latency chart.
 - Implement SSH with a Larktun-specific password/key dialog and a special shared Larktun tunnel route, so the peer connection reuses the logged-in app-only tsnet runtime.
 - Store remembered Larktun SSH passwords in encrypted account-scoped preferences, separate from manual `ConnectionProfile` passwords.
-- Implement Open Web with a loopback reverse proxy backed by the shared Larktun tunnel. The proxy should be replaced when another peer is opened and cleaned up automatically after a short idle window.
+- Implement Open Web with an in-app WebView plus loopback HTTP/CONNECT forward proxy backed by the shared Larktun tunnel. The proxy should be replaced when another peer is opened and cleaned up automatically after a short idle window. External browsers must not be used for Larktun device browsing because they cannot be configured to use the app-only tsnet runtime.
 - Add `Save as connection` after the temporary connection path is stable.
 
 ## Verification

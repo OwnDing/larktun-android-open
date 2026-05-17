@@ -56,6 +56,7 @@ import sh.haven.core.data.larktun.LarktunSshCredential
 import sh.haven.core.tunnel.LarktunTailnetManager
 import sh.haven.core.tunnel.LarktunTailnetPeer
 import sh.haven.core.tunnel.LarktunTailnetStatus
+import sh.haven.core.tunnel.LarktunWebProxySession
 import sh.haven.core.mosh.MoshSessionManager
 import sh.haven.core.et.EtSessionManager
 import sh.haven.core.fido.FidoAuthenticator
@@ -415,7 +416,7 @@ class ConnectionsViewModel @Inject constructor(
         )
     }
 
-    suspend fun openLarktunPeerWeb(peer: LarktunTailnetPeer): String {
+    suspend fun openLarktunPeerWeb(peer: LarktunTailnetPeer): LarktunWebProxySession {
         val host = peer.bestAddress
             ?: throw IllegalArgumentException("No address available for ${peer.bestName}")
         return larktunTailnetManager.startWebProxy(host = host, port = 80)
