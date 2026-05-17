@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">Блокировка экрана</string>
-    <string name="settings_biometric_subtitle">Требовать аутентификацию для открытия Haven</string>
+    <string name="settings_biometric_subtitle">Требовать аутентификацию для открытия Larktun</string>
     <string name="settings_lock_timeout_title">Время блокировки</string>
     <string name="settings_prevent_screenshots_title">Запрет снимков экрана</string>
     <string name="settings_prevent_screenshots_subtitle">Блокировать захват экрана и превью в диспетчере задач</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">Обработка…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">О Haven</string>
-    <string name="settings_support_title">Поддержать Haven</string>
+    <string name="settings_about_title">О Larktun</string>
+    <string name="settings_support_title">Поддержать Larktun</string>
     <string name="settings_support_subtitle">Угостить разработчика кофе</string>
     <string name="settings_version_unknown">неизвестно</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">Восстановить</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">О Haven</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">О Larktun</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Клиент SSH, VNC, RDP и облачного хранилища с открытым кодом для Android</string>
     <string name="settings_about_version">Версия %1$s (сборка %2$d)</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>

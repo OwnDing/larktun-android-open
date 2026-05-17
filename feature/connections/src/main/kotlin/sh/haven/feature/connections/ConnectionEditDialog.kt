@@ -765,7 +765,7 @@ fun ConnectionEditDialog(
                         )
                     }
                     Text(
-                        "Default on. Turn off if the server rejects Haven's NLA (some Windows Server 2025 setups — the server must have \"Require NLA\" disabled for SSL-only to connect).",
+                        "Default on. Turn off if the server rejects Larktun's NLA (some Windows Server 2025 setups - the server must have \"Require NLA\" disabled for SSL-only to connect).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

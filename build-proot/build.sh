@@ -110,8 +110,10 @@ build_for_arch() {
     local PROOT_SRC="$BUILD_DIR/proot-termux"
     cp -a proot-termux "$PROOT_SRC"
 
-    # Patch missing includes for NDK
-    sed -i '1i #include <string.h>' "$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c" 2>/dev/null || true
+    # Patch missing includes for newer NDKs. Use perl instead of sed -i so the
+    # script works on both macOS/BSD sed and GNU sed hosts.
+    perl -0pi -e 's/\A/#include <string.h>\n/ unless /^#include <string\.h>/m' \
+        "$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c"
 
     (
         cd "$PROOT_SRC/src"

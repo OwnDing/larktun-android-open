@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Larktun</string>
 
     <!-- Navigation labels live in :core:ui strings.xml so all locales
          share one source. The previous `nav_connections = "Connections"`
@@ -39,7 +39,7 @@
 
     <!-- Battery optimization -->
     <string name="battery_title">연결을 계속 유지할까요?</string>
-    <string name="battery_message">Android는 배터리 절약을 위해 백그라운드 SSH 연결을 종료할 수 있습니다. Haven의 배터리 최적화를 해제하면 이를 방지할 수 있습니다.</string>
+    <string name="battery_message">Android는 배터리 절약을 위해 백그라운드 SSH 연결을 종료할 수 있습니다. Larktun의 배터리 최적화를 해제하면 이를 방지할 수 있습니다.</string>
 
     <!-- Workspace profiles -->
     <string name="workspace_section_title">작업 공간</string>

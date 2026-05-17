@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">قفل الشاشة</string>
-    <string name="settings_biometric_subtitle">طلب المصادقة لفتح Haven</string>
+    <string name="settings_biometric_subtitle">طلب المصادقة لفتح Larktun</string>
     <string name="settings_lock_timeout_title">مهلة القفل</string>
     <string name="settings_prevent_screenshots_title">منع لقطات الشاشة</string>
     <string name="settings_prevent_screenshots_subtitle">حظر التقاط الشاشة ومعاينة مبدّل التطبيقات</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">جارٍ المعالجة…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">حول Haven</string>
-    <string name="settings_support_title">ادعم Haven</string>
+    <string name="settings_about_title">حول Larktun</string>
+    <string name="settings_support_title">ادعم Larktun</string>
     <string name="settings_support_subtitle">اشترِ فنجان قهوة للمطوّر</string>
     <string name="settings_version_unknown">غير معروف</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">استعادة</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">حول Haven</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">حول Larktun</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">عميل مفتوح المصدر لـ SSH و VNC و RDP والتخزين السحابي لـ Android</string>
     <string name="settings_about_version">الإصدار %1$s (بناء %2$d)</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>

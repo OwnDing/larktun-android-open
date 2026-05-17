@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">화면 잠금</string>
-    <string name="settings_biometric_subtitle">Haven을 열 때 인증 요구</string>
+    <string name="settings_biometric_subtitle">Larktun을 열 때 인증 요구</string>
     <string name="settings_lock_timeout_title">잠금 제한 시간</string>
     <string name="settings_prevent_screenshots_title">스크린샷 방지</string>
     <string name="settings_prevent_screenshots_subtitle">화면 캡처와 작업 전환기 미리보기를 차단합니다</string>
@@ -98,8 +98,8 @@
     <string name="settings_backup_working">작업 중…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">Haven 정보</string>
-    <string name="settings_support_title">Haven 지원</string>
+    <string name="settings_about_title">Larktun 정보</string>
+    <string name="settings_support_title">Larktun 지원</string>
     <string name="settings_support_subtitle">개발자에게 커피 후원</string>
     <string name="settings_version_unknown">알 수 없음</string>
 
@@ -134,8 +134,8 @@
     <string name="settings_backup_restore_button">복원</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">Haven 정보</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">Larktun 정보</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Android용 오픈 소스 SSH, VNC, RDP 및 클라우드 스토리지 클라이언트</string>
     <string name="settings_about_version">버전 %1$s(빌드 %2$d)</string>
     <string name="settings_about_android">Android %1$s(API %2$d)</string>

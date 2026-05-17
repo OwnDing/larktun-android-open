@@ -724,7 +724,7 @@ fun SettingsScreen(
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
                         as? android.content.ClipboardManager
                     clipboard?.setPrimaryClip(
-                        android.content.ClipData.newPlainText("Haven MCP endpoint", endpointUrl),
+                        android.content.ClipData.newPlainText("Larktun MCP endpoint", endpointUrl),
                     )
                     Toast.makeText(context, "Endpoint copied", Toast.LENGTH_SHORT).show()
                 },
@@ -738,7 +738,7 @@ fun SettingsScreen(
                         as? android.content.ClipboardManager
                     clipboard?.setPrimaryClip(
                         android.content.ClipData.newPlainText(
-                            "Haven MCP server config",
+                            "Larktun MCP server config",
                             mcpConfigJson,
                         ),
                     )
@@ -754,7 +754,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.SwapVert,
                 title = "Tunnel to a remote SSH profile…",
-                subtitle = "Add a -R 8730 → 127.0.0.1:8730 rule so an MCP client running on the SSH server can reach Haven via localhost",
+                subtitle = "Add a -R 8730 -> 127.0.0.1:8730 rule so an MCP client running on the SSH server can reach Larktun via localhost",
                 onClick = { showMcpTunnelPicker = true },
             )
             SettingsItem(
@@ -1332,7 +1332,7 @@ private fun BackupPasswordDialog(
     )
 }
 
-private const val GITHUB_URL = "https://github.com/GlassOnTin/Haven"
+private const val GITHUB_URL = "https://github.com/OwnDing/larktun-android-open"
 private const val KOFI_URL = "https://ko-fi.com/glassontin"
 
 @Composable

@@ -94,7 +94,7 @@ internal class McpTools(
     /** Tool registry: name → handler. */
     private val tools: Map<String, ToolHandler> = linkedMapOf(
         "get_app_info" to ToolHandler(
-            description = "Return Haven version, active rclone remotes, and which optional features are available in this build.",
+            description = "Return Larktun version, active rclone remotes, and which optional features are available in this build.",
             inputSchema = emptyObjectSchema(),
         ) { _ -> getAppInfo() },
 
@@ -109,7 +109,7 @@ internal class McpTools(
         ) { _ -> listSessions() },
 
         "list_rclone_remotes" to ToolHandler(
-            description = "List rclone cloud storage remotes configured in Haven.",
+            description = "List rclone cloud storage remotes configured in Larktun.",
             inputSchema = emptyObjectSchema(),
         ) { _ -> listRcloneRemotes() },
 
@@ -191,7 +191,7 @@ internal class McpTools(
         ) { _ -> stopStream() },
 
         "play_file" to ToolHandler(
-            description = "Open a media URL in the system player (VLC, MX Player, Chrome, etc.) via Android's ACTION_VIEW intent. Typically the playerUrl/playlistUrl returned by stream_sftp_file, or any http/https/content URL the agent already knows. The user's preferred app picker (or default app) decides what handles it — Haven only kicks off the intent.",
+            description = "Open a media URL in the system player (VLC, MX Player, Chrome, etc.) via Android's ACTION_VIEW intent. Typically the playerUrl/playlistUrl returned by stream_sftp_file, or any http/https/content URL the agent already knows. The user's preferred app picker (or default app) decides what handles it — Larktun only kicks off the intent.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -350,7 +350,7 @@ internal class McpTools(
         ) { args -> removePortForward(args) },
 
         "upload_file" to ToolHandler(
-            description = "Write a local file to a path on any connected backend (local, SSH, SMB, rclone). Source must live under Haven's app cache (context.cacheDir) — the agent has no other writable surface, so this constraint blocks reads of arbitrary device files via the upload destination. Currently uses small-file semantics (loads the source into memory); streaming variants ship in a later #126 stage. Replaces upload_file_to_sftp; that still works as a deprecated alias for the SSH streaming path.",
+            description = "Write a local file to a path on any connected backend (local, SSH, SMB, rclone). Source must live under Larktun's app cache (context.cacheDir) — the agent has no other writable surface, so this constraint blocks reads of arbitrary device files via the upload destination. Currently uses small-file semantics (loads the source into memory); streaming variants ship in a later #126 stage. Replaces upload_file_to_sftp; that still works as a deprecated alias for the SSH streaming path.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -385,7 +385,7 @@ internal class McpTools(
         ) { args -> deleteFile(args) },
 
         "upload_file_to_sftp" to ToolHandler(
-            description = "DEPRECATED: prefer upload_file(profileId=..., localPath=..., remotePath=...). Upload a local file to a path on a connected SFTP profile. Source must be a path under Haven's app cache (context.cacheDir) — the agent has no other writable surface, so this constraint blocks reads of arbitrary files via the upload destination. Requires a connected SSH/SFTP session. Uses streaming SFTP put (no in-memory buffer); use this for files larger than ~50 MiB until upload_file gains streaming support.",
+            description = "DEPRECATED: prefer upload_file(profileId=..., localPath=..., remotePath=...). Upload a local file to a path on a connected SFTP profile. Source must be a path under Larktun's app cache (context.cacheDir) — the agent has no other writable surface, so this constraint blocks reads of arbitrary files via the upload destination. Requires a connected SSH/SFTP session. Uses streaming SFTP put (no in-memory buffer); use this for files larger than ~50 MiB until upload_file gains streaming support.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -445,7 +445,7 @@ internal class McpTools(
         ) { _ -> openDeveloperSettings() },
 
         "install_apk_from_url" to ToolHandler(
-            description = "Download an APK from a URL and install it on the device via Shizuku-driven `pm install`. Useful for agent-driven self-update or sideloading over VPN where wireless ADB isn't reachable. Requires Shizuku running and granted to Haven. Installation happens silently from the user's perspective once consent is given — no system installer dialog.",
+            description = "Download an APK from a URL and install it on the device via Shizuku-driven `pm install`. Useful for agent-driven self-update or sideloading over VPN where wireless ADB isn't reachable. Requires Shizuku running and granted to Larktun. Installation happens silently from the user's perspective once consent is given — no system installer dialog.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -463,7 +463,7 @@ internal class McpTools(
         ) { args -> installApkFromUrl(args) },
 
         "enable_wireless_adb" to ToolHandler(
-            description = "Turn on Android's Wireless debugging (`adb connect` over WiFi) by setting `adb_wifi_enabled=1` via Shizuku. Requires Shizuku to be running and Haven to have its permission granted. NOTE: on Android 11+, a host that has never paired with this device must still complete the pairing-code flow manually — this tool cannot bypass that. For an already-paired host (the common case after a phone reboot) flipping the flag is enough.",
+            description = "Turn on Android's Wireless debugging (`adb connect` over WiFi) by setting `adb_wifi_enabled=1` via Shizuku. Requires Shizuku to be running and Larktun to have its permission granted. NOTE: on Android 11+, a host that has never paired with this device must still complete the pairing-code flow manually — this tool cannot bypass that. For an already-paired host (the common case after a phone reboot) flipping the flag is enough.",
             inputSchema = emptyObjectSchema(),
             consentLevel = ConsentLevel.EVERY_CALL,
             summarise = { _ -> "Enable Wireless debugging on this device?" },
@@ -476,7 +476,7 @@ internal class McpTools(
         ) { _ -> openLocalShell() },
 
         "set_terminal_font_from_url" to ToolHandler(
-            description = "Download a TTF/OTF font from a URL, validate it, install it as Haven's terminal font (replacing any prior custom font), and return the saved path. Useful for agent-driven Nerd Font installs (#123). Requires the URL to be reachable from the device — use a tunneled URL (via add_port_forward LOCAL) to expose a workstation HTTP server back through the existing SSH session.",
+            description = "Download a TTF/OTF font from a URL, validate it, install it as Larktun's terminal font (replacing any prior custom font), and return the saved path. Useful for agent-driven Nerd Font installs (#123). Requires the URL to be reachable from the device — use a tunneled URL (via add_port_forward LOCAL) to expose a workstation HTTP server back through the existing SSH session.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -492,7 +492,7 @@ internal class McpTools(
         ) { args -> setTerminalFontFromUrl(args) },
 
         "convert_file" to ToolHandler(
-            description = "Run ffmpeg to transcode a source URL (typically the playerUrl/playlistUrl from stream_sftp_file, or any URL ffmpeg can read) into a new file in Haven's app cache. Returns the cache path on success — use upload_file_to_sftp to put the result on a remote.",
+            description = "Run ffmpeg to transcode a source URL (typically the playerUrl/playlistUrl from stream_sftp_file, or any URL ffmpeg can read) into a new file in Larktun's app cache. Returns the cache path on success — use upload_file_to_sftp to put the result on a remote.",
             inputSchema = JSONObject().apply {
                 put("type", "object")
                 put("properties", JSONObject().apply {
@@ -568,7 +568,7 @@ internal class McpTools(
     // --- Tool implementations ---
 
     private fun getAppInfo(): JSONObject = JSONObject().apply {
-        put("app", "haven")
+        put("app", "larktun")
         put("version", sh.haven.app.BuildConfig.VERSION_NAME)
         put("versionCode", sh.haven.app.BuildConfig.VERSION_CODE)
         put("buildType", sh.haven.app.BuildConfig.BUILD_TYPE)
@@ -755,7 +755,7 @@ internal class McpTools(
             throw McpError(-32602, "Cannot resolve localPath: ${e.message}")
         }
         if (!source.path.startsWith(cacheRoot.path + File.separator) && source.path != cacheRoot.path) {
-            throw McpError(-32602, "localPath must be inside Haven's app cache (${cacheRoot.path})")
+            throw McpError(-32602, "localPath must be inside Larktun's app cache (${cacheRoot.path})")
         }
         if (!source.exists() || !source.isFile) {
             throw McpError(-32602, "localPath does not point to a regular file")
@@ -985,7 +985,7 @@ internal class McpTools(
             // target activity.
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             // For content:// URIs the granting flag lets the chosen
-            // player read through Haven's FileProvider; harmless on
+            // player read through Larktun's FileProvider; harmless on
             // http(s) URLs.
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -1157,7 +1157,7 @@ internal class McpTools(
             throw McpError(-32602, "Cannot resolve localPath: ${e.message}")
         }
         if (!source.path.startsWith(cacheRoot.path + File.separator) && source.path != cacheRoot.path) {
-            throw McpError(-32602, "localPath must be inside Haven's app cache (${cacheRoot.path})")
+            throw McpError(-32602, "localPath must be inside Larktun's app cache (${cacheRoot.path})")
         }
         if (!source.exists() || !source.isFile) {
             throw McpError(-32602, "localPath does not point to a regular file")
@@ -1279,17 +1279,17 @@ internal class McpTools(
         }
         // Stage the APK in app cache, then pipe it into `pm install -S`
         // via Shizuku. Cap at 200 MB so a misdirected URL can't fill
-        // the device storage; full Haven release APKs are ~80–100 MB,
+        // the device storage; full Larktun release APKs are ~80–100 MB,
         // so the cap leaves headroom.
         val maxBytes = 200L * 1024 * 1024
         val cacheDir = File(context.cacheDir, "agent-install").apply { mkdirs() }
-        val target = File(cacheDir, "haven-agent-install-${System.currentTimeMillis()}.apk")
+        val target = File(cacheDir, "larktun-agent-install-${System.currentTimeMillis()}.apk")
         val written = try {
             val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 30_000
                 readTimeout = 60_000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "Haven/1.0 (install_apk_from_url)")
+                setRequestProperty("User-Agent", "Larktun/1.0 (install_apk_from_url)")
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
@@ -1348,7 +1348,7 @@ internal class McpTools(
             target.delete()
             throw McpError(
                 -32603,
-                "${e.message}. Install Shizuku from https://shizuku.rikka.app and grant Haven permission, then retry.",
+                "${e.message}. Install Shizuku from https://shizuku.rikka.app and grant Larktun permission, then retry.",
             )
         } catch (e: Exception) {
             target.delete()
@@ -1382,7 +1382,7 @@ internal class McpTools(
         } catch (e: IllegalStateException) {
             throw McpError(
                 -32603,
-                "${e.message}. Install Shizuku from https://shizuku.rikka.app and grant Haven permission, then retry.",
+                "${e.message}. Install Shizuku from https://shizuku.rikka.app and grant Larktun permission, then retry.",
             )
         } catch (e: Exception) {
             throw McpError(-32603, "Shizuku exec failed: ${e.message}")

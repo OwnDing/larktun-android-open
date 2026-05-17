@@ -3,13 +3,16 @@ package sh.haven.feature.connections
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Circle
@@ -50,6 +54,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -109,8 +114,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -124,6 +133,10 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import sh.haven.core.data.db.entities.ConnectionGroup
 import sh.haven.core.data.db.entities.ConnectionProfile
+import sh.haven.core.data.larktun.LarktunCaptcha
+import sh.haven.core.data.larktun.LarktunSession
+import sh.haven.core.tunnel.LarktunTailnetPeer
+import sh.haven.core.tunnel.LarktunTailnetStatus
 import sh.haven.core.ssh.SshSessionManager
 
 /** Profile group colors — matches TAB_GROUP_COLORS in TerminalScreen. */
@@ -160,11 +173,17 @@ fun ConnectionsScreen(
     viewModel: ConnectionsViewModel = hiltViewModel(),
 ) {
     val connections by viewModel.connections.collectAsState()
+    val larktunSession by viewModel.larktunSession.collectAsState()
+    val larktunCaptcha by viewModel.larktunCaptcha.collectAsState()
+    val larktunAuthBusy by viewModel.larktunAuthBusy.collectAsState()
+    val larktunAuthError by viewModel.larktunAuthError.collectAsState()
+    val larktunTailnetStatus by viewModel.larktunTailnetStatus.collectAsState()
     val groups by viewModel.groups.collectAsState()
     val sshKeys by viewModel.sshKeys.collectAsState()
     val tunnelConfigs by viewModel.tunnelConfigs.collectAsState()
     var showTunnelsScreen by remember { mutableStateOf(false) }
     var showDesktopsScreen by remember { mutableStateOf(false) }
+    var showLarktunAccount by rememberSaveable { mutableStateOf(false) }
     val profileStatuses by viewModel.profileStatuses.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
 
@@ -867,11 +886,40 @@ fun ConnectionsScreen(
         )
     }
 
+    if (showLarktunAccount) {
+        LarktunAccountDialog(
+            session = larktunSession,
+            captcha = larktunCaptcha,
+            isBusy = larktunAuthBusy,
+            errorMessage = larktunAuthError,
+            defaultControlUrl = viewModel.larktunDefaultControlUrl,
+            onRefreshCaptcha = viewModel::refreshLarktunCaptcha,
+            onLogin = viewModel::loginLarktun,
+            onManualSession = viewModel::saveManualLarktunSession,
+            onSignOut = viewModel::signOutLarktun,
+            onDismissError = viewModel::clearLarktunAuthError,
+            onDismiss = { showLarktunAccount = false },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.connections_title)) },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            showLarktunAccount = true
+                            if (larktunSession == null && larktunCaptcha == null) {
+                                viewModel.refreshLarktunCaptcha()
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Icons.Filled.AccountCircle,
+                            contentDescription = stringResource(R.string.connections_larktun_my),
+                        )
+                    }
                     // Lit when the MCP transport has been called in the
                     // last 30s; absent entirely until the audit table
                     // has its first row. Tapping jumps to the audit
@@ -1133,6 +1181,14 @@ fun ConnectionsScreen(
 
                 LazyColumn(state = lazyListState, modifier = Modifier.fillMaxSize()) {
                     item(key = "workspace-section") { workspaceSection() }
+                    if (larktunSession != null) {
+                        item(key = "larktun-tailnet-devices") {
+                            LarktunTailnetDevicesSection(
+                                status = larktunTailnetStatus,
+                                onRefresh = viewModel::refreshLarktunTailnetStatus,
+                            )
+                        }
+                    }
                     displayIds.forEach { key ->
                         if (key.startsWith("group-")) {
                             val gid = key.removePrefix("group-")
@@ -1302,6 +1358,402 @@ fun ConnectionsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun LarktunTailnetDevicesSection(
+    status: LarktunTailnetStatus,
+    onRefresh: () -> Unit,
+) {
+    val peers = remember(status.peers) {
+        status.peers
+            .filter { it.bestAddress != null }
+            .sortedWith(
+                compareByDescending<LarktunTailnetPeer> { it.online || it.active }
+                    .thenBy { it.bestName.lowercase() },
+            )
+    }
+    val caption = when (status.phase) {
+        LarktunTailnetStatus.Phase.STARTING -> stringResource(R.string.connections_larktun_network_starting)
+        LarktunTailnetStatus.Phase.RUNNING -> status.tailnetName
+            ?: stringResource(R.string.connections_larktun_devices_caption)
+        LarktunTailnetStatus.Phase.ERROR -> stringResource(R.string.connections_larktun_network_error)
+        LarktunTailnetStatus.Phase.IDLE -> stringResource(R.string.connections_larktun_devices_caption)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.connections_larktun_devices),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        Icons.Filled.Refresh,
+                        contentDescription = stringResource(R.string.connections_larktun_refresh_devices),
+                    )
+                }
+            }
+
+            status.lastError?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            when {
+                status.phase == LarktunTailnetStatus.Phase.STARTING -> {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Text(stringResource(R.string.connections_larktun_network_starting))
+                    }
+                }
+                peers.isEmpty() -> {
+                    Text(
+                        text = stringResource(R.string.connections_larktun_no_devices),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                else -> {
+                    peers.forEachIndexed { index, peer ->
+                        if (index > 0) {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        }
+                        LarktunTailnetPeerRow(peer = peer)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LarktunTailnetPeerRow(peer: LarktunTailnetPeer) {
+    val statusLabel = when {
+        peer.active -> stringResource(R.string.connections_larktun_device_active)
+        peer.online -> stringResource(R.string.connections_larktun_device_online)
+        else -> stringResource(R.string.connections_larktun_device_offline)
+    }
+    val statusColor = when {
+        peer.active || peer.online -> Color(0xFF2E7D32)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    ListItem(
+        leadingContent = {
+            Icon(Icons.Filled.Laptop, contentDescription = null)
+        },
+        headlineContent = {
+            Text(peer.bestName)
+        },
+        supportingContent = {
+            Text(
+                listOfNotNull(
+                    peer.bestAddress,
+                    peer.os?.takeIf { it.isNotBlank() },
+                ).joinToString("  |  "),
+            )
+        },
+        trailingContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Circle,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = statusColor,
+                )
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = statusColor,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun LarktunAccountDialog(
+    session: LarktunSession?,
+    captcha: LarktunCaptcha?,
+    isBusy: Boolean,
+    errorMessage: String?,
+    defaultControlUrl: String,
+    onRefreshCaptcha: () -> Unit,
+    onLogin: (String, String, String) -> Unit,
+    onManualSession: (String, String) -> Unit,
+    onSignOut: () -> Unit,
+    onDismissError: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (session != null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.connections_larktun_my)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = session.accountName ?: stringResource(R.string.connections_larktun_signed_in),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    LarktunAccountLine(
+                        title = stringResource(R.string.connections_larktun_control_server),
+                        value = session.serverUrl,
+                    )
+                    session.entitlement?.let { entitlement ->
+                        LarktunAccountLine(
+                            title = stringResource(R.string.connections_larktun_plan),
+                            value = listOfNotNull(entitlement.planCode, entitlement.status)
+                                .joinToString(" / ")
+                                .ifBlank { stringResource(R.string.common_not_now) },
+                        )
+                        entitlement.deviceLimit?.let { limit ->
+                            LarktunAccountLine(
+                                title = stringResource(R.string.connections_larktun_device_usage),
+                                value = "${entitlement.deviceCount ?: 0}/$limit",
+                            )
+                        }
+                    }
+                    errorMessage?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        onSignOut()
+                        onDismiss()
+                    },
+                    enabled = !isBusy,
+                ) {
+                    Icon(Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.connections_larktun_sign_out))
+                }
+            },
+        )
+        return
+    }
+
+    var username by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var captchaCode by rememberSaveable { mutableStateOf("") }
+    var manualAuthKey by rememberSaveable { mutableStateOf("") }
+    var manualControlUrl by rememberSaveable { mutableStateOf(defaultControlUrl) }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    val captchaBitmap = remember(captcha?.imageBase64) {
+        decodeCaptchaImage(captcha?.imageBase64)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.connections_larktun_sign_in_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        onDismissError()
+                    },
+                    label = { Text(stringResource(R.string.connections_larktun_username)) },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        onDismissError()
+                    },
+                    label = { Text(stringResource(R.string.common_password)) },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Next,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = captchaCode,
+                    onValueChange = {
+                        captchaCode = it
+                        onDismissError()
+                    },
+                    label = { Text(stringResource(R.string.connections_larktun_captcha)) },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(72.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(8.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            captchaBitmap != null -> Image(
+                                bitmap = captchaBitmap,
+                                contentDescription = stringResource(R.string.connections_larktun_captcha_image),
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            isBusy -> CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                            else -> Text(
+                                text = stringResource(R.string.connections_larktun_captcha_placeholder),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    TextButton(
+                        onClick = onRefreshCaptcha,
+                        enabled = !isBusy,
+                    ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.connections_larktun_refresh_captcha))
+                    }
+                }
+                errorMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                    Text(stringResource(R.string.connections_larktun_advanced_setup))
+                }
+                if (showAdvanced) {
+                    OutlinedTextField(
+                        value = manualAuthKey,
+                        onValueChange = { manualAuthKey = it },
+                        label = { Text(stringResource(R.string.connections_larktun_auth_key)) },
+                        singleLine = true,
+                        enabled = !isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = manualControlUrl,
+                        onValueChange = { manualControlUrl = it },
+                        label = { Text(stringResource(R.string.connections_larktun_control_url)) },
+                        singleLine = true,
+                        enabled = !isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = { onManualSession(manualAuthKey, manualControlUrl) },
+                        enabled = !isBusy && manualAuthKey.isNotBlank() && manualControlUrl.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.connections_larktun_save_manual))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onLogin(username, password, captchaCode) },
+                enabled = !isBusy &&
+                    username.isNotBlank() &&
+                    password.isNotBlank() &&
+                    captchaCode.isNotBlank() &&
+                    captcha != null,
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(stringResource(R.string.connections_larktun_login))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isBusy) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun LarktunAccountLine(title: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+private fun decodeCaptchaImage(base64String: String?): androidx.compose.ui.graphics.ImageBitmap? {
+    val raw = base64String?.trim().orEmpty()
+    if (raw.isEmpty()) return null
+    val payload = raw.substringAfter(',', raw).trim()
+    return runCatching {
+        val bytes = Base64.decode(payload, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()
 }
 
 private fun quickConnectAction(

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Larktun</string>
 
 
     <!-- Common strings shared across modules -->
@@ -35,7 +35,7 @@
 
     <!-- Battery optimization -->
     <string name="battery_title">Verbindungen aufrechterhalten?</string>
-    <string name="battery_message">Android kann SSH-Hintergrundverbindungen zur Akkuschonung beenden. Das Deaktivieren der Akkuoptimierung für Haven verhindert dies.</string>
+    <string name="battery_message">Android kann SSH-Hintergrundverbindungen zur Akkuschonung beenden. Das Deaktivieren der Akkuoptimierung für Larktun verhindert dies.</string>
 
     <!-- Workspace profiles -->
     <string name="workspace_section_title">Arbeitsbereiche</string>

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -47,6 +48,12 @@ import sh.haven.core.ssh.SessionManagerRegistry
 import sh.haven.core.ssh.SshSessionManager
 import sh.haven.core.ssh.SshVerboseLogger
 import sh.haven.core.data.db.entities.KnownHost
+import sh.haven.core.data.larktun.LarktunAccountRepository
+import sh.haven.core.data.larktun.LarktunCaptcha
+import sh.haven.core.data.larktun.LarktunConfig
+import sh.haven.core.data.larktun.LarktunSession
+import sh.haven.core.tunnel.LarktunTailnetManager
+import sh.haven.core.tunnel.LarktunTailnetStatus
 import sh.haven.core.mosh.MoshSessionManager
 import sh.haven.core.et.EtSessionManager
 import sh.haven.core.fido.FidoAuthenticator
@@ -102,6 +109,8 @@ class ConnectionsViewModel @Inject constructor(
     private val tunnelManager: sh.haven.core.tunnel.TunnelManager,
     private val tunnelConfigRepository: sh.haven.core.data.repository.TunnelConfigRepository,
     private val certRenewalGate: CertRenewalGate,
+    private val larktunAccountRepository: LarktunAccountRepository,
+    private val larktunTailnetManager: LarktunTailnetManager,
 ) : ViewModel() {
 
     /**
@@ -135,6 +144,30 @@ class ConnectionsViewModel @Inject constructor(
     val connections: StateFlow<List<ConnectionProfile>> = repository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val larktunSession: StateFlow<LarktunSession?> = larktunAccountRepository.session
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val larktunTailnetStatus: StateFlow<LarktunTailnetStatus> = larktunTailnetManager.status
+
+    init {
+        viewModelScope.launch {
+            larktunSession.collectLatest { session ->
+                larktunTailnetManager.applySession(session)
+            }
+        }
+    }
+
+    private val _larktunCaptcha = MutableStateFlow<LarktunCaptcha?>(null)
+    val larktunCaptcha: StateFlow<LarktunCaptcha?> = _larktunCaptcha.asStateFlow()
+
+    private val _larktunAuthBusy = MutableStateFlow(false)
+    val larktunAuthBusy: StateFlow<Boolean> = _larktunAuthBusy.asStateFlow()
+
+    private val _larktunAuthError = MutableStateFlow<String?>(null)
+    val larktunAuthError: StateFlow<String?> = _larktunAuthError.asStateFlow()
+
+    val larktunDefaultControlUrl: String = LarktunConfig.DEFAULT_CONTROL_URL
+
     val groups: StateFlow<List<sh.haven.core.data.db.entities.ConnectionGroup>> =
         connectionGroupDao.observeAll()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -156,6 +189,103 @@ class ConnectionsViewModel @Inject constructor(
     fun dismissBatteryPrompt() {
         viewModelScope.launch {
             preferencesRepository.setBatteryPromptDismissed()
+        }
+    }
+
+    fun refreshLarktunCaptcha() {
+        if (_larktunAuthBusy.value) return
+        viewModelScope.launch {
+            _larktunAuthBusy.value = true
+            try {
+                _larktunCaptcha.value = larktunAccountRepository.fetchCaptcha()
+                _larktunAuthError.value = null
+            } catch (e: Exception) {
+                _larktunAuthError.value = e.message ?: "Failed to load captcha"
+            } finally {
+                _larktunAuthBusy.value = false
+            }
+        }
+    }
+
+    fun loginLarktun(username: String, password: String, captchaCode: String) {
+        val captcha = _larktunCaptcha.value
+        if (captcha == null) {
+            _larktunAuthError.value = "Captcha is not ready"
+            refreshLarktunCaptcha()
+            return
+        }
+        if (username.isBlank() || password.isBlank() || captchaCode.isBlank()) {
+            _larktunAuthError.value = "Username, password, and captcha are required"
+            return
+        }
+        viewModelScope.launch {
+            _larktunAuthBusy.value = true
+            try {
+                larktunAccountRepository.login(
+                    username = username.trim(),
+                    password = password,
+                    captchaCode = captchaCode.trim(),
+                    captchaId = captcha.captchaId,
+                )
+                _larktunCaptcha.value = null
+                _larktunAuthError.value = null
+            } catch (e: Exception) {
+                _larktunAuthError.value = e.message ?: "Larktun login failed"
+                try {
+                    _larktunCaptcha.value = larktunAccountRepository.fetchCaptcha()
+                } catch (_: Exception) {
+                    // Keep the login error visible if captcha refresh also fails.
+                }
+            } finally {
+                _larktunAuthBusy.value = false
+            }
+        }
+    }
+
+    fun saveManualLarktunSession(authKey: String, controlUrl: String) {
+        if (authKey.isBlank() || controlUrl.isBlank()) {
+            _larktunAuthError.value = "Auth key and control URL are required"
+            return
+        }
+        viewModelScope.launch {
+            _larktunAuthBusy.value = true
+            try {
+                larktunAccountRepository.saveManualSession(
+                    authKey = authKey.trim(),
+                    serverUrl = controlUrl.trim(),
+                )
+                _larktunCaptcha.value = null
+                _larktunAuthError.value = null
+            } catch (e: Exception) {
+                _larktunAuthError.value = e.message ?: "Failed to save Larktun session"
+            } finally {
+                _larktunAuthBusy.value = false
+            }
+        }
+    }
+
+    fun signOutLarktun() {
+        viewModelScope.launch {
+            _larktunAuthBusy.value = true
+            try {
+                larktunAccountRepository.signOut()
+                _larktunCaptcha.value = null
+                _larktunAuthError.value = null
+            } catch (e: Exception) {
+                _larktunAuthError.value = e.message ?: "Failed to sign out"
+            } finally {
+                _larktunAuthBusy.value = false
+            }
+        }
+    }
+
+    fun clearLarktunAuthError() {
+        _larktunAuthError.value = null
+    }
+
+    fun refreshLarktunTailnetStatus() {
+        viewModelScope.launch {
+            larktunTailnetManager.refresh()
         }
     }
 
@@ -2623,7 +2753,7 @@ class ConnectionsViewModel @Inject constructor(
                         else append(" is")
                         append(" passphrase-protected; the forwarded agent will be empty.")
                     }
-                    hadNoStoredKeys -> "Agent forwarding enabled but no SSH keys are stored in Haven; the forwarded agent will be empty."
+                    hadNoStoredKeys -> "Agent forwarding enabled but no SSH keys are stored in Larktun; the forwarded agent will be empty."
                     else -> null
                 }
             }

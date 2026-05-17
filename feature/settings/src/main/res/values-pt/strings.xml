@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">Bloqueio de tela</string>
-    <string name="settings_biometric_subtitle">Exigir autenticação para abrir o Haven</string>
+    <string name="settings_biometric_subtitle">Exigir autenticação para abrir o Larktun</string>
     <string name="settings_lock_timeout_title">Tempo de bloqueio</string>
     <string name="settings_prevent_screenshots_title">Impedir capturas de tela</string>
     <string name="settings_prevent_screenshots_subtitle">Bloquear captura de tela e prévia do alternador de apps</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">Processando…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">Sobre o Haven</string>
-    <string name="settings_support_title">Apoiar o Haven</string>
+    <string name="settings_about_title">Sobre o Larktun</string>
+    <string name="settings_support_title">Apoiar o Larktun</string>
     <string name="settings_support_subtitle">Pague um café para o desenvolvedor</string>
     <string name="settings_version_unknown">desconhecido</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">Restaurar</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">Sobre o Haven</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">Sobre o Larktun</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Cliente de código aberto de SSH, VNC, RDP e armazenamento em nuvem para Android</string>
     <string name="settings_about_version">Versão %1$s (build %2$d)</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>

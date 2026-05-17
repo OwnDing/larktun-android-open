@@ -70,7 +70,7 @@
 
     <!-- Battery optimization dialog -->
     <string name="connections_battery_title">保持连接？</string>
-    <string name="connections_battery_message">Android 可能会为省电而关闭后台 SSH 连接。为 Haven 禁用电池优化可以防止此情况。</string>
+    <string name="connections_battery_message">Android 可能会为省电而关闭后台 SSH 连接。为 Larktun 禁用电池优化可以防止此情况。</string>
 
     <!-- Mosh setup guide dialog -->
     <string name="connections_mosh_not_found_title">服务器上未找到 Mosh</string>
@@ -253,7 +253,7 @@
     <string name="connections_fido_pin_help">此 SSH 密钥需要验证。请输入安全密钥上设置的 PIN 码以继续。</string>
     <string name="connections_fido_pin_wrong">PIN 码错误。安全密钥锁定前还有 %1$d 次尝试机会。</string>
     <string name="connections_fido_waiting_title">需要安全密钥</string>
-    <string name="connections_fido_waiting_body">通过 USB 插入安全密钥，或将其贴在设备背面以使用 NFC。检测到密钥后 Haven 会自动继续。</string>
+    <string name="connections_fido_waiting_body">通过 USB 插入安全密钥，或将其贴在设备背面以使用 NFC。检测到密钥后 Larktun 会自动继续。</string>
     <string name="connections_fido_touch_usb_title">触摸您的安全密钥</string>
     <string name="connections_fido_touch_usb_body">现在按下安全密钥上的按钮以授权 SSH 签名。密钥可能会闪烁提示等待操作。</string>
     <string name="connections_fido_touch_nfc_title">贴住您的安全密钥</string>
@@ -285,7 +285,7 @@
     <string name="connections_vm_step_open_port_body">在终端应用的设置中，将 8022 端口添加到监听端口列表。</string>
     <string name="connections_vm_step_password_body">在终端应用中运行。系统会提示为 droid 用户设置密码。</string>
     <string name="connections_vm_step_password_hint">然后通过 droid@localhost:8022 连接</string>
-    <string name="connections_vm_step_vnc_body">用于通过 Haven 的桌面标签页进行远程桌面访问。</string>
+    <string name="connections_vm_step_vnc_body">用于通过 Larktun 的桌面标签页进行远程桌面访问。</string>
     <string name="connections_vm_step_desktop_body">Xfce4 轻量且通过 VNC 表现良好。</string>
     <string name="connections_vm_step_apps_body">文件管理器、文本编辑器、图片查看器、浏览器、计算器。</string>
 

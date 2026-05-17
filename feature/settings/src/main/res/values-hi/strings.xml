@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">स्क्रीन लॉक</string>
-    <string name="settings_biometric_subtitle">Haven खोलने के लिए प्रमाणीकरण आवश्यक करें</string>
+    <string name="settings_biometric_subtitle">Larktun खोलने के लिए प्रमाणीकरण आवश्यक करें</string>
     <string name="settings_lock_timeout_title">लॉक टाइमआउट</string>
     <string name="settings_prevent_screenshots_title">स्क्रीनशॉट रोकें</string>
     <string name="settings_prevent_screenshots_subtitle">स्क्रीन कैप्चर और टास्क स्विचर प्रीव्यू ब्लॉक करें</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">कार्यरत…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">Haven के बारे में</string>
-    <string name="settings_support_title">Haven का समर्थन करें</string>
+    <string name="settings_about_title">Larktun के बारे में</string>
+    <string name="settings_support_title">Larktun का समर्थन करें</string>
     <string name="settings_support_subtitle">डेवलपर को कॉफ़ी पिलाएँ</string>
     <string name="settings_version_unknown">अज्ञात</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">पुनर्स्थापित करें</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">Haven के बारे में</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">Larktun के बारे में</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Android के लिए ओपन सोर्स SSH, VNC, RDP और क्लाउड स्टोरेज क्लाइंट</string>
     <string name="settings_about_version">संस्करण %1$s (बिल्ड %2$d)</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>

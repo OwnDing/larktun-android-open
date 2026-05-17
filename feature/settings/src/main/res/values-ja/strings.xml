@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">画面ロック</string>
-    <string name="settings_biometric_subtitle">Havenを開くときに認証を要求</string>
+    <string name="settings_biometric_subtitle">Larktunを開くときに認証を要求</string>
     <string name="settings_lock_timeout_title">ロックまでの時間</string>
     <string name="settings_prevent_screenshots_title">スクリーンショットを防止</string>
     <string name="settings_prevent_screenshots_subtitle">画面キャプチャとタスクスイッチャーのプレビューをブロック</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">処理中…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">Havenについて</string>
-    <string name="settings_support_title">Havenを支援</string>
+    <string name="settings_about_title">Larktunについて</string>
+    <string name="settings_support_title">Larktunを支援</string>
     <string name="settings_support_subtitle">開発者にコーヒーをおごる</string>
     <string name="settings_version_unknown">不明</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">復元</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">Havenについて</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">Larktunについて</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Android向けオープンソースSSH、VNC、RDP、クラウドストレージクライアント</string>
     <string name="settings_about_version">バージョン %1$s（ビルド %2$d）</string>
     <string name="settings_about_android">Android %1$s（API %2$d）</string>

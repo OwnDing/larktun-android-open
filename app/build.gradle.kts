@@ -69,7 +69,7 @@ android {
             if (abiCode != null) {
                 output.versionCodeOverride = (defaultConfig.versionCode ?: 0) * 10 + abiCode
             }
-            output.outputFileName = "haven-${variant.versionName}-$abi-${variant.buildType.name}.apk"
+            output.outputFileName = "larktun-${variant.versionName}-$abi-${variant.buildType.name}.apk"
         }
     }
 

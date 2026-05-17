@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Larktun</string>
 
     <!-- Navigation labels live in :core:ui strings.xml so all locales
          share one source. The previous `nav_connections = "Connections"`
@@ -39,7 +39,7 @@
 
     <!-- Battery optimization -->
     <string name="battery_title">Keep connections alive?</string>
-    <string name="battery_message">Android may close background SSH connections to save battery. Disabling battery optimization for Haven prevents this.</string>
+    <string name="battery_message">Android may close background SSH connections to save battery. Disabling battery optimization for Larktun prevents this.</string>
 
     <!-- Workspace profiles -->
     <string name="workspace_section_title">Workspaces</string>

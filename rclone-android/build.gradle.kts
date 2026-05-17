@@ -51,12 +51,8 @@ val buildRcloneNative by tasks.registering(Exec::class) {
     inputs.dir(goDir)
     inputs.file(toolsDir.resolve("build-android.sh"))
     outputs.dir(jniDir)
-
-    // Skip if native libs already exist (avoids expensive Go cross-compile on every build)
-    onlyIf {
-        !jniDir.resolve("arm64-v8a/libgojni.so").exists() ||
-            !jniDir.resolve("x86_64/libgojni.so").exists()
-    }
+    outputs.file(file("build/rcbridge-bindings.jar"))
+    outputs.file(file("build/rcbridge.aar"))
 
     workingDir = projectDir
     commandLine("bash", toolsDir.resolve("build-android.sh").absolutePath)

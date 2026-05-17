@@ -72,7 +72,7 @@ internal fun biometricLockStateFor(
 ): BiometricLockState {
     if (!hasFragmentActivity) {
         return BiometricLockState.Blocked(
-            title = "Haven is locked",
+            title = "Larktun is locked",
             body = "Cannot show authentication prompt in this context.",
             canOpenSettings = false,
         )
@@ -81,7 +81,7 @@ internal fun biometricLockStateFor(
         BiometricAuthenticator.Availability.AVAILABLE -> BiometricLockState.Prompt
         BiometricAuthenticator.Availability.NOT_ENROLLED -> BiometricLockState.Blocked(
             title = "Set up a screen lock",
-            body = "Haven app-lock is enabled, but this device has no screen lock " +
+            body = "Larktun app-lock is enabled, but this device has no screen lock " +
                 "or biometric enrolled. Set one up in device Settings to unlock.",
             canOpenSettings = true,
         )
@@ -161,7 +161,7 @@ fun BiometricLockScreen(
     }
 
     LockedSurface(
-        title = "Haven is locked",
+        title = "Larktun is locked",
         body = "Authenticate to continue",
         errorMessage = errorMessage,
         primaryLabel = "Unlock",

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Larktun</string>
 
 
     <!-- Common strings shared across modules -->
@@ -35,7 +35,7 @@
 
     <!-- Battery optimization -->
     <string name="battery_title">कनेक्शन सक्रिय रखें?</string>
-    <string name="battery_message">Android बैटरी बचाने के लिए बैकग्राउंड SSH कनेक्शन बंद कर सकता है। Haven के लिए बैटरी ऑप्टिमाइज़ेशन अक्षम करने से यह रुक जाएगा।</string>
+    <string name="battery_message">Android बैटरी बचाने के लिए बैकग्राउंड SSH कनेक्शन बंद कर सकता है। Larktun के लिए बैटरी ऑप्टिमाइज़ेशन अक्षम करने से यह रुक जाएगा।</string>
 
     <!-- Workspace profiles -->
     <string name="workspace_section_title">वर्कस्पेस</string>

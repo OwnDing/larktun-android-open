@@ -1,0 +1,168 @@
+package sh.haven.core.tunnel
+
+import android.content.Context
+import android.os.Build
+import android.provider.Settings
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import sh.haven.core.data.larktun.LarktunConfig
+import sh.haven.core.data.larktun.LarktunSession
+
+@Singleton
+class LarktunTailnetManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutex = Mutex()
+
+    private val _status = MutableStateFlow(LarktunTailnetStatus.idle())
+    val status: StateFlow<LarktunTailnetStatus> = _status.asStateFlow()
+
+    private var currentSessionKey: String? = null
+    private var tunnel: TailscaleTunnel? = null
+    private var pollingJob: Job? = null
+
+    suspend fun applySession(session: LarktunSession?) {
+        if (session == null) {
+            stop()
+        } else {
+            start(session)
+        }
+    }
+
+    suspend fun refresh() {
+        refreshStatus()
+    }
+
+    private suspend fun start(session: LarktunSession) = mutex.withLock {
+        val nextSessionKey = session.sessionKey()
+        if (currentSessionKey == nextSessionKey && tunnel != null) {
+            tunnel?.let { _status.value = readStatus(it) }
+            return@withLock
+        }
+
+        stopLocked()
+        _status.value = LarktunTailnetStatus.starting()
+
+        try {
+            val stateDir = File(context.filesDir, "larktun-tailnet-$nextSessionKey").also {
+                it.mkdirs()
+            }
+            tunnel = withContext(Dispatchers.IO) {
+                TailscaleTunnel(
+                    authKey = session.authKey,
+                    stateDir = stateDir,
+                    hostname = buildHostname(),
+                    controlURL = session.serverUrl,
+                )
+            }
+            currentSessionKey = nextSessionKey
+            tunnel?.let { _status.value = readStatus(it) }
+            pollingJob = scope.launch {
+                while (isActive) {
+                    delay(5_000)
+                    refreshStatus()
+                }
+            }
+        } catch (e: Exception) {
+            stopLocked()
+            _status.value = LarktunTailnetStatus.error(
+                e.message ?: "Failed to start Larktun network",
+            )
+        }
+    }
+
+    private suspend fun stop() = mutex.withLock {
+        stopLocked()
+        _status.value = LarktunTailnetStatus.idle()
+    }
+
+    private fun stopLocked() {
+        pollingJob?.cancel()
+        pollingJob = null
+        try {
+            tunnel?.close()
+        } catch (_: Throwable) {
+            // Best-effort teardown.
+        }
+        tunnel = null
+        currentSessionKey = null
+    }
+
+    private suspend fun refreshStatus() {
+        val snapshot = mutex.withLock { tunnel }
+        if (snapshot == null) {
+            _status.value = LarktunTailnetStatus.idle()
+            return
+        }
+
+        _status.value = readStatus(snapshot)
+    }
+
+    private suspend fun readStatus(snapshot: TailscaleTunnel): LarktunTailnetStatus =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                LarktunTailnetStatus.fromJson(snapshot.statusJson())
+            }.getOrElse { error ->
+                LarktunTailnetStatus.error(error.message ?: "Failed to read Larktun devices")
+            }
+        }
+
+    private fun buildHostname(): String {
+        val androidId = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID,
+        ).orEmpty().takeLast(6)
+        return sanitizeHostname(
+            listOfNotNull(
+                LarktunConfig.ANDROID_HOSTNAME_PREFIX,
+                Build.MODEL,
+                androidId.takeIf { it.isNotBlank() },
+            ).joinToString("-"),
+        )
+    }
+
+    private fun LarktunSession.sessionKey(): String {
+        val stableIdentity = listOfNotNull(
+            serverUrl,
+            account?.id,
+            account?.username,
+            accessToken,
+            authKey.take(16),
+        ).joinToString("|")
+        return sha256(stableIdentity).take(16)
+    }
+
+    private fun sha256(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun sanitizeHostname(value: String): String {
+        val cleaned = value.lowercase()
+            .map { if (it.isLetterOrDigit()) it else '-' }
+            .joinToString("")
+            .trim('-')
+            .replace(Regex("-+"), "-")
+            .take(63)
+            .trim('-')
+        return cleaned.ifBlank { LarktunConfig.ANDROID_HOSTNAME_PREFIX }
+    }
+}

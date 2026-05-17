@@ -33,7 +33,7 @@
 
     <!-- Security section -->
     <string name="settings_biometric_title">屏幕锁定</string>
-    <string name="settings_biometric_subtitle">需要身份验证才能打开 Haven</string>
+    <string name="settings_biometric_subtitle">需要身份验证才能打开 Larktun</string>
     <string name="settings_lock_timeout_title">锁定超时</string>
     <string name="settings_prevent_screenshots_title">阻止截图</string>
     <string name="settings_prevent_screenshots_subtitle">阻止屏幕截图和任务切换器预览</string>
@@ -86,8 +86,8 @@
     <string name="settings_backup_working">处理中…</string>
 
     <!-- About section -->
-    <string name="settings_about_title">关于 Haven</string>
-    <string name="settings_support_title">支持 Haven</string>
+    <string name="settings_about_title">关于 Larktun</string>
+    <string name="settings_support_title">支持 Larktun</string>
     <string name="settings_support_subtitle">请开发者喝杯咖啡</string>
     <string name="settings_version_unknown">未知</string>
 
@@ -122,8 +122,8 @@
     <string name="settings_backup_restore_button">恢复</string>
 
     <!-- About dialog -->
-    <string name="settings_about_dialog_title">关于 Haven</string>
-    <string name="settings_about_app_name">Haven</string>
+    <string name="settings_about_dialog_title">关于 Larktun</string>
+    <string name="settings_about_app_name">Larktun</string>
     <string name="settings_about_description">Android 开源 SSH、VNC、RDP 和云存储客户端</string>
     <string name="settings_about_version">版本 %1$s（构建 %2$d）</string>
     <string name="settings_about_android">Android %1$s (API %2$d)</string>

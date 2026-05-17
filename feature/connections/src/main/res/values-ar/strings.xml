@@ -70,7 +70,7 @@
 
     <!-- Battery optimization dialog -->
     <string name="connections_battery_title">إبقاء الاتصالات نشطة؟</string>
-    <string name="connections_battery_message">قد يغلق Android اتصالات SSH في الخلفية لتوفير البطارية. تعطيل تحسين البطارية لـ Haven يمنع ذلك.</string>
+    <string name="connections_battery_message">قد يغلق Android اتصالات SSH في الخلفية لتوفير البطارية. تعطيل تحسين البطارية لـ Larktun يمنع ذلك.</string>
 
     <!-- Mosh setup guide dialog -->
     <string name="connections_mosh_not_found_title">لم يتم العثور على Mosh على الخادم</string>
@@ -230,7 +230,7 @@
     <string name="connections_fido_pin_help">This SSH key was registered with verify-required. Enter the PIN configured on your security key to continue.</string>
     <string name="connections_fido_pin_wrong">Wrong PIN. %1$d attempts remaining before the key locks.</string>
     <string name="connections_fido_waiting_title">Security key required</string>
-    <string name="connections_fido_waiting_body">Plug in your security key over USB, or tap it on the back of the device for NFC. Haven will continue automatically once it is detected.</string>
+    <string name="connections_fido_waiting_body">Plug in your security key over USB, or tap it on the back of the device for NFC. Larktun will continue automatically once it is detected.</string>
     <string name="connections_fido_touch_usb_title">Touch your security key</string>
     <string name="connections_fido_touch_usb_body">Press the button on your security key now to authorise the SSH signature. The key may blink to indicate it is waiting.</string>
     <string name="connections_fido_touch_nfc_title">Hold your security key</string>
@@ -247,7 +247,7 @@
     <string name="connections_vm_step_open_port_body">In the Terminal app settings, add port 8022 to the listening ports list.</string>
     <string name="connections_vm_step_password_body">Run in the Terminal app. You\'ll be prompted to set a password for the droid user.</string>
     <string name="connections_vm_step_password_hint">Then connect with: droid@localhost:8022</string>
-    <string name="connections_vm_step_vnc_body">For remote desktop access via Haven\'s Desktop tab.</string>
+    <string name="connections_vm_step_vnc_body">For remote desktop access via Larktun\'s Desktop tab.</string>
     <string name="connections_vm_step_desktop_body">Xfce4 is lightweight and works well over VNC.</string>
     <string name="connections_vm_step_apps_body">File manager, text editor, image viewer, browser, calculator.</string>
 

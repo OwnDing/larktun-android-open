@@ -54,6 +54,8 @@ class TailscaleTunnel internal constructor(
             // Best-effort teardown.
         }
     }
+
+    fun statusJson(): String = native.statusJSON()
 }
 
 /**

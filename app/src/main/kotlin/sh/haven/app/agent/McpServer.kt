@@ -42,12 +42,12 @@ import kotlin.concurrent.thread
 private const val TAG = "McpServer"
 
 /**
- * Minimal Model Context Protocol (MCP) server for Haven.
+ * Minimal Model Context Protocol (MCP) server for Larktun.
  *
  * Binds to **127.0.0.1 only** (loopback) so the server is reachable
  * from local processes (any MCP client running in PRoot, a script,
  * a curl test) but not from the LAN. This is the agent transport
- * that implements Haven's "shared viewport" principle:
+ * that implements Larktun's "shared viewport" principle:
  * every observable state and action a human has in the UI should be
  * reachable by an agent through the same underlying ViewModels and
  * repositories.
@@ -133,7 +133,7 @@ class McpServer @Inject constructor(
     val endpointUrl: StateFlow<String?> = _endpointUrl.asStateFlow()
 
     /**
-     * Standard MCP server registration JSON for the Haven endpoint.
+     * Standard MCP server registration JSON for the Larktun endpoint.
      * Null when the server isn't running. Any MCP-aware client can
      * merge this into its own config; the shape is compatible with
      * the common `{ "mcpServers": { "name": { "type", "url" } } }`
@@ -451,7 +451,7 @@ class McpServer @Inject constructor(
         return JSONObject().apply {
             put("protocolVersion", "2025-06-18")
             put("serverInfo", JSONObject().apply {
-                put("name", "haven-agent")
+                put("name", "larktun-agent")
                 put("version", sh.haven.app.BuildConfig.VERSION_NAME)
             })
             put("capabilities", JSONObject().apply {
@@ -461,7 +461,7 @@ class McpServer @Inject constructor(
                 })
             })
             put("instructions",
-                "Haven is a mobile thin-client OS for distributed compute, storage, and presence. " +
+                "Larktun is a mobile thin-client OS for distributed compute, storage, and presence. " +
                     "Use these tools to inspect the user's saved connections, active sessions, and " +
                     "cloud storage without disturbing the UI they're looking at.")
         }

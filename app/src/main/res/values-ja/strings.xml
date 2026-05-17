@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Larktun</string>
 
 
     <!-- Common strings shared across modules -->
@@ -35,7 +35,7 @@
 
     <!-- Battery optimization -->
     <string name="battery_title">接続を維持しますか？</string>
-    <string name="battery_message">Androidはバッテリー節約のためにバックグラウンドのSSH接続を切断することがあります。Havenのバッテリー最適化を無効にするとこれを防げます。</string>
+    <string name="battery_message">Androidはバッテリー節約のためにバックグラウンドのSSH接続を切断することがあります。Larktunのバッテリー最適化を無効にするとこれを防げます。</string>
 
     <!-- Workspace profiles -->
     <string name="workspace_section_title">ワークスペース</string>

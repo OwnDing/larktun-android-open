@@ -150,7 +150,7 @@ fun AuditLogScreen(
                         onShare = { text ->
                             val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Haven connection log: ${item.profileLabel}")
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Larktun connection log: ${item.profileLabel}")
                                 putExtra(android.content.Intent.EXTRA_TEXT, text)
                             }
                             context.startActivity(android.content.Intent.createChooser(intent, "Share log"))
