@@ -67,6 +67,14 @@ class LarktunTailnetManager @Inject constructor(
         }
     }
 
+    suspend fun sendFile(peerId: String, filePath: String, fileName: String) {
+        val snapshot = mutex.withLock { tunnel }
+            ?: throw IllegalStateException("Larktun network is not running")
+        withContext(Dispatchers.IO) {
+            snapshot.sendTaildropFile(peerId, filePath, fileName)
+        }
+    }
+
     suspend fun startWebProxy(host: String, port: Int = 80): LarktunWebProxySession {
         val snapshot = mutex.withLock { tunnel }
             ?: throw IllegalStateException("Larktun network is not running")

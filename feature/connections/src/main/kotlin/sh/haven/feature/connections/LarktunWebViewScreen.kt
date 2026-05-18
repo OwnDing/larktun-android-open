@@ -9,10 +9,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +43,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -67,13 +66,19 @@ fun LarktunWebViewScreen(
 ) {
     val context = LocalContext.current
     var webView by remember(page.proxyUrl, page.initialUrl) { mutableStateOf<WebView?>(null) }
-    var title by remember(page.title) { mutableStateOf(page.title) }
     var currentUrl by remember(page.initialUrl) { mutableStateOf(page.initialUrl) }
     var progress by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
-    var addressText by remember(page.initialUrl) { mutableStateOf(page.initialUrl) }
+    var addressValue by remember(page.initialUrl) {
+        mutableStateOf(
+            TextFieldValue(
+                text = page.initialUrl,
+                selection = TextRange(page.initialUrl.length),
+            ),
+        )
+    }
     var requestedUrl by remember(page.initialUrl) { mutableStateOf(page.initialUrl) }
     var addressFocused by remember { mutableStateOf(false) }
     var proxyReady by remember(page.proxyUrl) { mutableStateOf(false) }
@@ -81,7 +86,7 @@ fun LarktunWebViewScreen(
 
     fun navigateToAddress(rawAddress: String) {
         val nextUrl = normalizeLarktunWebUrl(rawAddress, currentUrl)
-        addressText = nextUrl
+        addressValue = TextFieldValue(nextUrl, TextRange(nextUrl.length))
         requestedUrl = nextUrl
         webView?.let { view ->
             view.tag = nextUrl
@@ -126,88 +131,69 @@ fun LarktunWebViewScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = title.ifBlank { page.title },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = currentUrl,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_close))
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            enabled = canGoBack,
-                            onClick = { webView?.goBack() },
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.connections_larktun_web_back),
-                            )
-                        }
-                        IconButton(
-                            enabled = canGoForward,
-                            onClick = { webView?.goForward() },
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = stringResource(R.string.connections_larktun_web_forward),
-                            )
-                        }
-                        IconButton(onClick = { webView?.reload() }) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = stringResource(R.string.connections_larktun_web_reload),
-                            )
-                        }
-                    },
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+            TopAppBar(
+                title = {
                     OutlinedTextField(
-                        value = addressText,
-                        onValueChange = { addressText = it },
-                        label = { Text(stringResource(R.string.connections_larktun_web_address)) },
+                        value = addressValue,
+                        onValueChange = { addressValue = it },
+                        placeholder = { Text(stringResource(R.string.connections_larktun_web_address)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(
-                            onGo = { navigateToAddress(addressText) },
+                            onGo = { navigateToAddress(addressValue.text) },
                         ),
+                        trailingIcon = {
+                            IconButton(onClick = { navigateToAddress(addressValue.text) }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = stringResource(R.string.connections_larktun_web_go),
+                                )
+                            }
+                        },
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .onFocusChanged { focusState ->
                                 addressFocused = focusState.isFocused
+                                if (focusState.isFocused) {
+                                    addressValue = addressValue.copy(
+                                        selection = TextRange(addressValue.text.length),
+                                    )
+                                }
                             },
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_close))
+                    }
+                },
+                actions = {
                     IconButton(
-                        onClick = { navigateToAddress(addressText) },
-                        modifier = Modifier.padding(top = 8.dp),
+                        enabled = canGoBack,
+                        onClick = { webView?.goBack() },
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.connections_larktun_web_back),
+                        )
+                    }
+                    IconButton(
+                        enabled = canGoForward,
+                        onClick = { webView?.goForward() },
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = stringResource(R.string.connections_larktun_web_go),
+                            contentDescription = stringResource(R.string.connections_larktun_web_forward),
                         )
                     }
-                }
-            }
+                    IconButton(onClick = { webView?.reload() }) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.connections_larktun_web_reload),
+                        )
+                    }
+                },
+            )
         },
     ) { innerPadding ->
         Column(
@@ -245,10 +231,15 @@ fun LarktunWebViewScreen(
                     targetUrl = requestedUrl,
                     onWebView = { view -> webView = view },
                     onStateChanged = { state ->
-                        title = state.title ?: page.title
                         currentUrl = state.url ?: page.initialUrl
                         if (!addressFocused) {
-                            addressText = state.url ?: page.initialUrl
+                            val nextAddress = state.url ?: page.initialUrl
+                            if (addressValue.text != nextAddress) {
+                                addressValue = TextFieldValue(
+                                    text = nextAddress,
+                                    selection = TextRange(nextAddress.length),
+                                )
+                            }
                         }
                         progress = state.progress
                         loading = state.loading

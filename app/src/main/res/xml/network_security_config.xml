@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Default: refuse cleartext for everything outside loopback. -->
-    <base-config cleartextTrafficPermitted="false" />
+    <!-- Larktun's in-app WebView browses private tailnet HTTP services
+         through the app-local tsnet proxy. Many device admin pages are
+         still plain HTTP, so cleartext must be allowed at the WebView
+         policy layer even though transport leaves the phone through tsnet. -->
+    <base-config cleartextTrafficPermitted="true" />
     <!-- Loopback (127.0.0.1) cannot be MITM'd, and Haven's own
          architecture leans on loopback HTTP servers (rclone serve,
          HLS, the MCP transport, and any port forward that resolves

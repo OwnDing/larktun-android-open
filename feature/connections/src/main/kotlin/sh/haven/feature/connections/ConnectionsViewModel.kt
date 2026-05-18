@@ -2,6 +2,8 @@ package sh.haven.feature.connections
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -72,6 +74,7 @@ import sh.haven.core.stepca.CertRenewalGate
 import android.util.Log
 import com.jcraft.jsch.Proxy
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 
 private const val TAG = "ConnectionsVM"
@@ -420,10 +423,89 @@ class ConnectionsViewModel @Inject constructor(
     }
 
     suspend fun openLarktunPeerWeb(peer: LarktunTailnetPeer): LarktunWebProxySession {
-        val host = peer.bestAddress
+        val host = peer.primaryTailscaleIP ?: peer.bestAddress
             ?: throw IllegalArgumentException("No address available for ${peer.bestName}")
         return larktunTailnetManager.startWebProxy(host = host, port = 80)
     }
+
+    suspend fun sendLarktunFile(peer: LarktunTailnetPeer, uri: Uri) {
+        if (peer.id.isBlank()) {
+            _error.value = "No device ID available for ${peer.bestName}"
+            return
+        }
+        val fileName = withContext(Dispatchers.IO) {
+            resolveTaildropDisplayName(uri)
+        }
+        val stagedFile = withContext(Dispatchers.IO) {
+            stageTaildropFile(uri, fileName)
+        }
+        try {
+            larktunTailnetManager.sendFile(
+                peerId = peer.id,
+                filePath = stagedFile.absolutePath,
+                fileName = fileName,
+            )
+            _warning.value = appContext.getString(
+                R.string.connections_larktun_send_file_success,
+                fileName,
+                peer.bestName,
+            )
+        } catch (e: Exception) {
+            _error.value = appContext.getString(
+                R.string.connections_larktun_send_file_failed_with_reason,
+                e.message ?: "unknown error",
+            )
+            throw e
+        } finally {
+            withContext(Dispatchers.IO) {
+                stagedFile.delete()
+            }
+        }
+    }
+
+    private fun resolveTaildropDisplayName(uri: Uri): String {
+        val cursorName = appContext.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) cursor.getString(index) else null
+            } else {
+                null
+            }
+        }
+        return sanitizeTaildropName(cursorName ?: uri.lastPathSegment ?: "larktun-file")
+    }
+
+    private fun stageTaildropFile(uri: Uri, fileName: String): File {
+        val stagingDir = File(appContext.cacheDir, "larktun-taildrop").also { it.mkdirs() }
+        val stagedFile = File(stagingDir, "${java.util.UUID.randomUUID()}-$fileName")
+        try {
+            val input = appContext.contentResolver.openInputStream(uri)
+                ?: throw IOException("Unable to open selected file")
+            input.use { source ->
+                stagedFile.outputStream().use { target ->
+                    source.copyTo(target)
+                }
+            }
+            return stagedFile
+        } catch (e: Exception) {
+            stagedFile.delete()
+            throw e
+        }
+    }
+
+    private fun sanitizeTaildropName(value: String): String =
+        File(value)
+            .name
+            .replace(Regex("[\\r\\n]"), " ")
+            .trim()
+            .take(180)
+            .ifBlank { "larktun-file" }
 
     val sessions: StateFlow<Map<String, SshSessionManager.SessionState>> = sshSessionManager.sessions
 

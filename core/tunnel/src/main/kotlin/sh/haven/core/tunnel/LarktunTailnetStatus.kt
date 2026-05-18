@@ -88,7 +88,16 @@ data class LarktunTailnetPeer(
     val keyExpiry: String? = null,
 ) {
     val bestName: String
-        get() = firstNonBlank(aliasName, displayName, hostName, computedName, name, dnsName, id)
+        get() = firstNonBlank(
+            aliasName,
+            hostName,
+            displayName,
+            computedName,
+            name,
+            dnsName?.substringBefore('.'),
+            tailscaleIPs.firstOrNull(),
+            id,
+        )
             ?: "Unknown device"
 
     val bestAddress: String?

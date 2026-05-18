@@ -69,6 +69,19 @@ class TailscaleTunnel internal constructor(
 
     fun pingJson(address: String, timeoutMs: Int = 3_000): String =
         native.pingJSON(address, timeoutMs.toLong())
+
+    fun sendTaildropFile(
+        peerId: String,
+        filePath: String,
+        fileName: String,
+        timeoutMs: Int = 30 * 60 * 1_000,
+    ) {
+        try {
+            native.taildropSendFile(peerId, filePath, fileName, timeoutMs.toLong())
+        } catch (e: Exception) {
+            throw IOException("Taildrop send failed: ${e.message}", e)
+        }
+    }
 }
 
 private const val TAG = "TailscaleTunnel"

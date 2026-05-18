@@ -123,11 +123,13 @@ Current action scope:
 - Menu entries should include:
   - `Ping`: open a Larktun ping sheet, run 10 app-only tsnet ping samples against the peer's primary Tailscale IP, and render the samples as a latency chart with the latest route mode (`Direct`, `DERP`, `Peer relay`, `TSMP`, or `Not connected`).
   - `SSH`: open a Larktun-specific SSH dialog, matching the iOS flow with `Password` and `SSH key` auth modes. Password mode supports saved Larktun device credentials and a remember-password checkbox. Key mode uses the existing Android `Keys` repository and asks for a passphrase when the selected key is encrypted.
-  - `Open Web`: open an in-app Android `WebView` instead of launching Chrome or another external browser. The WebView is configured with a loopback-only HTTP/CONNECT forward proxy, and that proxy dials HTTP/HTTPS targets through the shared Larktun tsnet runtime. Default the selected peer to `http://<peer>:80/`, but provide an editable address bar so the user can enter any `http://` or `https://` peer URL and port, such as `http://nas:8080/` or `https://router:8443/`.
+  - `Open Web`: open an in-app Android `WebView` instead of launching Chrome or another external browser. The WebView is configured with a loopback-only HTTP/CONNECT forward proxy, and that proxy dials HTTP/HTTPS targets through the shared Larktun tsnet runtime. Default the selected peer to `http://<tailscale-ip>:80/` so the browser address bar shows the tsnet IP rather than MagicDNS, but keep the top app bar address field editable so the user can enter any `http://` or `https://` peer URL and port, such as `http://100.x.y.z:8080/` or `https://router:8443/`.
+  - `Details`: show the Larktun peer detail sheet/dialog with alias, hostname, DNS name, Tailscale IPs, OS, online state, relay/handshake metadata, public key, and stable node ID. The detail view exposes `Send file`, which stages a selected Android document into app cache and sends it to the peer through the target device's PeerAPI. Android must not statically import Tailscale's receive-side Taildrop extension, because registering that extension during tsnet startup can reintroduce Android sandbox SIGSYS crashes.
   - `Copy Address`: copy MagicDNS name or primary Tailscale IP.
 - Larktun peer actions must not mutate or delete the live peer list.
 - Larktun peer actions should not create manual `ConnectionProfile` rows unless the user explicitly chooses a future `Save as connection` action.
 - When an action requires a running Larktun runtime, show a clear error if the user has signed out or the runtime is still starting.
+- Device names should match iOS behavior: prefer the Larktun/Meshyra node alias capability (`https://meshyra.example/cap/node-alias`, with Larktun legacy fallbacks) before falling back to hostname, display name, DNS, IP, or node ID.
 
 Larktun SSH credentials are account-scoped app credentials, not manual connection credentials:
 
@@ -139,7 +141,6 @@ Larktun SSH credentials are account-scoped app credentials, not manual connectio
 Optional actions after the first working pass:
 
 - Save as manual SSH connection.
-- Taildrop send file.
 - SFTP/file browser through the app-only SSH connection path.
 
 ## Integration With Manual Connections

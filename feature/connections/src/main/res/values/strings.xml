@@ -66,6 +66,7 @@
     <string name="connections_larktun_device_online">Online</string>
     <string name="connections_larktun_device_offline">Offline</string>
     <string name="connections_larktun_action_ping">Ping</string>
+    <string name="connections_larktun_action_details">Details</string>
     <string name="connections_larktun_action_ssh">SSH</string>
     <string name="connections_larktun_action_open_web">Open Web</string>
     <string name="connections_larktun_action_copy_address">Copy Address</string>
@@ -102,6 +103,24 @@
     <string name="connections_larktun_ssh_key_encrypted">Passphrase required</string>
     <string name="connections_larktun_ssh_forget_saved">Forget saved password</string>
     <string name="connections_larktun_ssh_connect">Connect</string>
+    <string name="connections_larktun_device_details_title">%1$s details</string>
+    <string name="connections_larktun_detail_alias">Alias</string>
+    <string name="connections_larktun_detail_hostname">Hostname</string>
+    <string name="connections_larktun_detail_dns">DNS</string>
+    <string name="connections_larktun_detail_ips">Tailscale IPs</string>
+    <string name="connections_larktun_detail_os">Operating system</string>
+    <string name="connections_larktun_detail_status">Status</string>
+    <string name="connections_larktun_detail_relay">Relay</string>
+    <string name="connections_larktun_detail_last_seen">Last seen</string>
+    <string name="connections_larktun_detail_last_handshake">Last handshake</string>
+    <string name="connections_larktun_detail_key_expiry">Key expiry</string>
+    <string name="connections_larktun_detail_public_key">Public key</string>
+    <string name="connections_larktun_detail_node_id">Node ID</string>
+    <string name="connections_larktun_detail_not_available">Not available</string>
+    <string name="connections_larktun_send_file">Send file</string>
+    <string name="connections_larktun_send_file_failed">Failed to send file</string>
+    <string name="connections_larktun_send_file_failed_with_reason">Failed to send file: %1$s</string>
+    <string name="connections_larktun_send_file_success">%1$s sent to %2$s</string>
 
     <!-- Empty state -->
     <string name="connections_empty_title">No connections yet</string>

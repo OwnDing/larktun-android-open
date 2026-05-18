@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Password
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.foundation.clickable
@@ -192,6 +194,8 @@ fun ConnectionsScreen(
     var showLarktunAccount by rememberSaveable { mutableStateOf(false) }
     var larktunPingPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
     var larktunSshPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
+    var larktunDetailPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
+    var larktunTaildropPeer by remember { mutableStateOf<LarktunTailnetPeer?>(null) }
     var larktunWebPage by remember { mutableStateOf<LarktunWebPage?>(null) }
     val profileStatuses by viewModel.profileStatuses.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
@@ -391,6 +395,23 @@ fun ConnectionsScreen(
     val batteryPromptDismissed by viewModel.batteryPromptDismissed.collectAsState()
     var showBatteryDialog by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val taildropFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val peer = larktunTaildropPeer
+        larktunTaildropPeer = null
+        if (uri != null && peer != null) {
+            scope.launch {
+                try {
+                    viewModel.sendLarktunFile(peer, uri)
+                } catch (e: Exception) {
+                    viewModel.showError(
+                        e.message ?: context.getString(R.string.connections_larktun_send_file_failed),
+                    )
+                }
+            }
+        }
+    }
 
     LaunchedEffect(batteryPromptDismissed) {
         if (!batteryPromptDismissed) {
@@ -634,6 +655,18 @@ fun ConnectionsScreen(
                 larktunSshPeer = null
             },
             onForgetCredential = viewModel::forgetLarktunSshCredential,
+        )
+    }
+
+    larktunDetailPeer?.let { peer ->
+        LarktunDeviceDetailDialog(
+            peer = peer,
+            onDismiss = { larktunDetailPeer = null },
+            onSendFile = { selectedPeer ->
+                larktunDetailPeer = null
+                larktunTaildropPeer = selectedPeer
+                taildropFileLauncher.launch(arrayOf("*/*"))
+            },
         )
     }
 
@@ -1238,6 +1271,7 @@ fun ConnectionsScreen(
                                 status = larktunTailnetStatus,
                                 onRefresh = viewModel::refreshLarktunTailnetStatus,
                                 onPing = { peer -> larktunPingPeer = peer },
+                                onDetails = { peer -> larktunDetailPeer = peer },
                                 onSsh = { peer ->
                                     if (peer.bestAddress == null) {
                                         viewModel.showError(context.getString(R.string.connections_larktun_no_address))
@@ -1456,6 +1490,7 @@ private fun LarktunTailnetDevicesSection(
     status: LarktunTailnetStatus,
     onRefresh: () -> Unit,
     onPing: (LarktunTailnetPeer) -> Unit,
+    onDetails: (LarktunTailnetPeer) -> Unit,
     onSsh: (LarktunTailnetPeer) -> Unit,
     onOpenWeb: (LarktunTailnetPeer) -> Unit,
     onCopyAddress: (LarktunTailnetPeer) -> Unit,
@@ -1542,6 +1577,7 @@ private fun LarktunTailnetDevicesSection(
                         LarktunTailnetPeerRow(
                             peer = peer,
                             onPing = onPing,
+                            onDetails = onDetails,
                             onSsh = onSsh,
                             onOpenWeb = onOpenWeb,
                             onCopyAddress = onCopyAddress,
@@ -1558,6 +1594,7 @@ private fun LarktunTailnetDevicesSection(
 private fun LarktunTailnetPeerRow(
     peer: LarktunTailnetPeer,
     onPing: (LarktunTailnetPeer) -> Unit,
+    onDetails: (LarktunTailnetPeer) -> Unit,
     onSsh: (LarktunTailnetPeer) -> Unit,
     onOpenWeb: (LarktunTailnetPeer) -> Unit,
     onCopyAddress: (LarktunTailnetPeer) -> Unit,
@@ -1628,6 +1665,11 @@ private fun LarktunTailnetPeerRow(
                 onClick = { showMenu = false; onPing(peer) },
             )
             DropdownMenuItem(
+                text = { Text(stringResource(R.string.connections_larktun_action_details)) },
+                leadingIcon = { Icon(Icons.Filled.Info, null) },
+                onClick = { showMenu = false; onDetails(peer) },
+            )
+            DropdownMenuItem(
                 text = { Text(stringResource(R.string.connections_larktun_action_ssh)) },
                 leadingIcon = { Icon(Icons.Filled.Terminal, null) },
                 enabled = hasAddress,
@@ -1646,6 +1688,123 @@ private fun LarktunTailnetPeerRow(
                 onClick = { showMenu = false; onCopyAddress(peer) },
             )
         }
+    }
+}
+
+@Composable
+private fun LarktunDeviceDetailDialog(
+    peer: LarktunTailnetPeer,
+    onDismiss: () -> Unit,
+    onSendFile: (LarktunTailnetPeer) -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    val statusLabel = when {
+        peer.active -> stringResource(R.string.connections_larktun_device_active)
+        peer.online -> stringResource(R.string.connections_larktun_device_online)
+        else -> stringResource(R.string.connections_larktun_device_offline)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.connections_larktun_device_details_title, peer.bestName))
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_alias),
+                    value = peer.aliasName,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_hostname),
+                    value = peer.hostName,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_dns),
+                    value = peer.dnsName,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_ips),
+                    value = peer.tailscaleIPs.joinToString("\n"),
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_os),
+                    value = peer.os,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_status),
+                    value = statusLabel,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_relay),
+                    value = listOfNotNull(peer.relay, peer.peerRelay)
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .distinct()
+                        .joinToString(" / "),
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_last_seen),
+                    value = peer.lastSeen,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_last_handshake),
+                    value = peer.lastHandshake,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_key_expiry),
+                    value = peer.keyExpiry,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_public_key),
+                    value = peer.publicKey,
+                )
+                LarktunDeviceDetailRow(
+                    label = stringResource(R.string.connections_larktun_detail_node_id),
+                    value = peer.id,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_close))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = peer.id.isNotBlank() && (peer.active || peer.online),
+                onClick = { onSendFile(peer) },
+            ) {
+                Icon(
+                    Icons.Filled.UploadFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.connections_larktun_send_file))
+            }
+        },
+    )
+}
+
+@Composable
+private fun LarktunDeviceDetailRow(
+    label: String,
+    value: String?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value?.trim()?.takeIf { it.isNotEmpty() }
+                ?: stringResource(R.string.connections_larktun_detail_not_available),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

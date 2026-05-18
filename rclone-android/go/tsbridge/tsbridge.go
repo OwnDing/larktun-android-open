@@ -34,7 +34,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/netip"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,7 +55,13 @@ import (
 	"tailscale.com/types/netmap"
 )
 
-const nodeAliasCapability = "sh.larktun.alias"
+const defaultTaildropSendTimeoutMillis = 30 * 60 * 1000
+
+var nodeAliasCapabilities = []tailcfg.NodeCapability{
+	"https://meshyra.example/cap/node-alias",
+	"https://larktun.com/cap/node-alias",
+	"sh.larktun.alias",
+}
 
 // init wires an Android-safe interface enumerator into tsnet's
 // RegisterInterfaceGetter hook. Tailscale added this hook specifically
@@ -520,6 +530,108 @@ func (t *TunnelHandle) PingJSON(ip string, timeoutMs int) (result string, err er
 	return string(data), nil
 }
 
+// TaildropSendFile sends a local file to a peer through its PeerAPI endpoint.
+// Keep this implementation self-contained instead of importing
+// tailscale.com/feature/taildrop: that extension registers receive-side
+// Taildrop hooks during tsnet startup, and those hooks pull Android app
+// sandboxes back into SIGSYS-prone syscall paths on Android 10/emulators.
+// For Larktun Android we only need outbound file sending.
+func (t *TunnelHandle) TaildropSendFile(peerID, filePath, fileName string, timeoutMs int) (err error) {
+	defer recoverToError("tsbridge TaildropSendFile", &err)
+
+	peerID = strings.TrimSpace(peerID)
+	filePath = strings.TrimSpace(filePath)
+	fileName = cleanTaildropFileName(fileName)
+	if peerID == "" {
+		return errors.New("peer id required")
+	}
+	if filePath == "" {
+		return errors.New("file path required")
+	}
+	if fileName == "" {
+		fileName = cleanTaildropFileName(filepath.Base(filePath))
+	}
+	if fileName == "" {
+		fileName = "larktun-file"
+	}
+	if timeoutMs <= 0 {
+		timeoutMs = defaultTaildropSendTimeoutMillis
+	}
+
+	t.mu.Lock()
+	if t.closed {
+		t.mu.Unlock()
+		return errors.New("tunnel closed")
+	}
+	srv := t.srv
+	t.mu.Unlock()
+	if srv == nil {
+		return errors.New("tunnel not started")
+	}
+
+	lc, err := srv.LocalClient()
+	if err != nil {
+		return fmt.Errorf("LocalClient: %w", err)
+	}
+	statusCtx, statusCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer statusCancel()
+	nm, err := currentNetworkMap(statusCtx, lc)
+	if err != nil {
+		return fmt.Errorf("read netmap: %w", err)
+	}
+	peerAPIBase := peerAPIBaseForStableID(nm, peerID)
+	if peerAPIBase == "" {
+		return fmt.Errorf("peer %s does not advertise PeerAPI", peerID)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open taildrop file: %w", err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("stat taildrop file: %w", err)
+	}
+	if info.IsDir() {
+		return errors.New("taildrop path is a directory")
+	}
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Duration(timeoutMs)*time.Millisecond,
+	)
+	defer cancel()
+
+	endpoint := strings.TrimRight(peerAPIBase, "/") + "/v0/put/" + url.PathEscape(fileName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, file)
+	if err != nil {
+		return fmt.Errorf("create taildrop request: %w", err)
+	}
+	req.ContentLength = info.Size()
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: nil,
+			DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+				return srv.Dial(ctx, network, address)
+			},
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send taildrop file: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return nil
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	return fmt.Errorf("taildrop peerapi %s: %s", resp.Status, strings.TrimSpace(string(body)))
+}
+
 func (t *TunnelHandle) statusPayload() statusPayload {
 	payload := statusPayload{
 		Status:       "idle",
@@ -833,14 +945,15 @@ func nodeAliasName(node tailcfg.NodeView) string {
 		return ""
 	}
 
-	values, ok := node.CapMap().GetOk(nodeAliasCapability)
-	if !ok {
-		return ""
-	}
-
-	for _, rawMessage := range values.All() {
-		if alias := aliasFromRawMessage(rawMessage); alias != "" {
-			return alias
+	for _, capability := range nodeAliasCapabilities {
+		values, ok := node.CapMap().GetOk(capability)
+		if !ok {
+			continue
+		}
+		for _, rawMessage := range values.All() {
+			if alias := aliasFromRawMessage(rawMessage); alias != "" {
+				return alias
+			}
 		}
 	}
 	return ""
@@ -922,6 +1035,86 @@ func nodeTailscaleIPs(node tailcfg.NodeView) []string {
 	return ips
 }
 
+func peerAPIBaseForStableID(nm *netmap.NetworkMap, peerID string) string {
+	peerID = strings.TrimSpace(peerID)
+	if nm == nil || peerID == "" {
+		return ""
+	}
+	for _, node := range nm.Peers {
+		if !node.Valid() {
+			continue
+		}
+		switch peerID {
+		case string(node.StableID()), node.Key().String(), nodeDNSName(node), nodeHostName(node):
+			return peerAPIBaseFromNetMap(nm, node)
+		}
+	}
+	return ""
+}
+
+func peerAPIBaseFromNetMap(nm *netmap.NetworkMap, peer tailcfg.NodeView) string {
+	if nm == nil || !peer.Valid() || !peer.Hostinfo().Valid() {
+		return ""
+	}
+
+	var have4, have6 bool
+	for _, address := range nm.GetAddresses().All() {
+		if !address.IsSingleIP() {
+			continue
+		}
+		switch {
+		case address.Addr().Is4():
+			have4 = true
+		case address.Addr().Is6():
+			have6 = true
+		}
+	}
+
+	port4, port6 := peerAPIPorts(peer)
+	switch {
+	case have4 && port4 != 0:
+		return peerAPIURL(nodeIP(peer, netip.Addr.Is4), port4)
+	case have6 && port6 != 0:
+		return peerAPIURL(nodeIP(peer, netip.Addr.Is6), port6)
+	default:
+		return ""
+	}
+}
+
+func peerAPIPorts(peer tailcfg.NodeView) (port4, port6 uint16) {
+	if !peer.Valid() || !peer.Hostinfo().Valid() {
+		return 0, 0
+	}
+	for _, service := range peer.Hostinfo().Services().All() {
+		switch service.Proto {
+		case tailcfg.PeerAPI4:
+			port4 = service.Port
+		case tailcfg.PeerAPI6:
+			port6 = service.Port
+		}
+	}
+	return port4, port6
+}
+
+func nodeIP(node tailcfg.NodeView, predicate func(netip.Addr) bool) netip.Addr {
+	if !node.Valid() {
+		return netip.Addr{}
+	}
+	for _, prefix := range node.Addresses().All() {
+		if prefix.IsSingleIP() && predicate(prefix.Addr()) {
+			return prefix.Addr()
+		}
+	}
+	return netip.Addr{}
+}
+
+func peerAPIURL(ip netip.Addr, port uint16) string {
+	if !ip.IsValid() || port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("http://%v", netip.AddrPortFrom(ip, port))
+}
+
 func nodeIsExitNode(node tailcfg.NodeView) bool {
 	if !node.Valid() {
 		return false
@@ -963,6 +1156,14 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func cleanTaildropFileName(fileName string) string {
+	fileName = strings.TrimSpace(fileName)
+	if fileName == "" {
+		return ""
+	}
+	return strings.TrimSpace(filepath.Base(fileName))
 }
 
 func formatTime(value time.Time) string {
